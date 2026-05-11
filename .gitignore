@@ -1,0 +1,74 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# ChromaDB / MemPalace
+storage/
+chroma_db/
+
+# Data & runtime
+data/
+*.db
+*.sqlite
+logs/
+*.log
+
+# Docker / deployment
+.env
+.env.*
+docker-compose.override.yml
+
+# Secrets
+credentials/
+*.pem
+*.key
+
+# Terraform
+deploy/cloud/terraform/.terraform/
+deploy/cloud/terraform/*.tfstate*
+deploy/cloud/terraform/*.tfvars
+
+# Node (N8N ecosystem)
+node_modules/
+
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/

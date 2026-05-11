@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "clawshell"
+version = "2.0.0-dev"
+description = "ClawShell 2.0 — 一云多端云边协同分布式神经系统"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.8"
+authors = [
+    {name = "ClawShell Contributors"}
+]
+keywords = ["ai-agent", "orchestration", "cloud-edge", "exoskeleton", "multi-agent"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+[project.optional-dependencies]
+cloud = [
+    "fastapi>=0.104.0",
+    "uvicorn>=0.24.0",
+    "websockets>=12.0",
+]
+edge = [
+    "psutil>=5.9.0",
+]
+
+[project.scripts]
+clawshell-cloud = "cloud.main:main"
+
+[project.urls]
+Homepage = "https://github.com/jorinyang/ClawShell"
+Documentation = "https://github.com/jorinyang/ClawShell/docs"
+Repository = "https://github.com/jorinyang/ClawShell.git"

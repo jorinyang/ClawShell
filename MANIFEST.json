@@ -1,124 +1,62 @@
 {
   "name": "ClawShell",
-  "version": "1.0.0",
-  "description": "ClawShell v1.0 - 自感知自适应自组织AI Agent编排系统",
-  "build_date": "2026-04-30",
-  "架构": {
-    "自感知层": "lib/layer1 - 系统健康监控、磁盘/进程/网关/服务监控",
-    "自适应层": "lib/layer2 - 自修复、发现、条件引擎、策略选择、状态收集、分析、响应",
-    "自组织层": "lib/layer3 - 任务组织、DAG编排、任务市场、调度、N8N集成、上下文管理",
-    "集群层": "lib/layer4 - Swarm管理、信任评估、生态系统、协议",
-    "核心基础设施": "lib/core - EventBus事件总线、Genome知识传承、Strategy策略库",
-    "Bridge接口": "lib/bridge - Hermes协同、持久层、外部工具"
-  },
-  "source_mapping": {
-    "~/.openclaw/eventbus/": "lib/core/eventbus/",
-    "~/.openclaw/genome/": "lib/core/genome/",
-    "~/.openclaw/strategies/": "lib/core/strategy/",
-    "~/.openclaw/adaptor/": "lib/layer2/",
-    "~/.openclaw/organizer/": "lib/layer3/",
-    "~/.openclaw/swarm/": "lib/layer4/",
-    "~/.openclaw/external/": "lib/bridge/external/",
-    "~/.openclaw/workspace/shared/hermes_bridge/": "lib/bridge/hermes/",
-    "~/.openclaw/clawshell/": "覆盖旧版v0.9",
-    "~/.openclaw/hooks/": "scripts/hooks/",
-    "~/.openclaw/scripts/": "scripts/",
-    "~/.openclaw/workspace/shared/scripts/": "scripts/",
-    "~/n8n/scripts/": "scripts/n8n/"
+  "version": "2.0.0-dev",
+  "codename": "云枢·端脑",
+  "description": "一云多端云边协同分布式神经系统 — AI Agent 编排与增强平台",
+  "build_date": "2026-05-12",
+  "architecture": {
+    "cloud_hub": {
+      "name": "云枢",
+      "description": "云端中枢 — 架构规划、深度思考、洞察分析、复盘总结、整理优化、成果广播、终端管理",
+      "components": {
+        "eventbus": "CloudEventBus — 持久化+去重+广播+过期",
+        "task_board": "GlobalTaskBoard — 跨Edge共享任务看板",
+        "skill_market": "SkillMarket — 发布/发现/同步/版本管理",
+        "capability_registry": "CapabilityRegistry — Edge注册+能力声明+调度",
+        "swarm_coordinator": "SwarmCoordinator — 心跳+离线检测+负载均衡",
+        "scheduler": "CronScheduler — 全局定时任务",
+        "evolution": "EvolutionEngine — 洞察聚合→模式挖掘→自动发布",
+        "review": "UnifiedReviewEngine — 日/周/月复盘",
+        "broadcast": "BroadcastEngine — 广播+最佳实践+跨Edge学习",
+        "n8n_bridge": "N8NBridge — 工作流自动化触发",
+        "vault_api": "VaultAPI — Obsidian OSS CRUD+搜索",
+        "memos_cloud": "MemOS Cloud API 客户端"
+      },
+      "deployment": "阿里云ECS + OSS + Docker"
+    },
+    "edge_brain": {
+      "name": "端脑",
+      "description": "端侧执行 — 环境检测、插件管理、IDE桥接、任务执行、离线自治",
+      "components": {
+        "detector": "10+ 框架自动检测 (Wukong/Hermes/OpenClaw/QClaw/CoPaw/HiClaw/EasyClaw/WorkBuddy)",
+        "ide_bridge": "6 IDE CLI 桥接 (Codex/Claude Code/Kimi Code/DeepSeek TUI/Copilot + orchestrator)",
+        "ecosystem": "10 生态组件 (MemPalace/ChromaDB/N8N/MemOS/Watchdog/BrowserRT/ONNX/psutil/websockets/Obsidian+OSS)",
+        "sync_daemon": "Edge↔Cloud 同步守护进程 (5s循环)",
+        "adapters": "框架适配器 (Wukong/Hermes/OpenClaw + action_reference)",
+        "config_wizard": "交互式配置向导"
+      }
+    },
+    "exoskeleton": {
+      "name": "外骨骼层",
+      "description": "四层智能增强 — 自感知/自适应/自组织/多Agent集群",
+      "layers": {
+        "layer1": "自感知 — 7 监控器 (Health/System/Disk/Process/Agent/Gateway/Service)",
+        "layer2": "自适应 — 9 引擎 (SelfRepair/Discovery/ML/Condition/Strategy/ControlLoop/AdaptiveTuner/RobustController/Sense)",
+        "layer3": "自组织 — 6 模块 (EventBus/Organizer/TaskMarket/Scheduler/ContextManager/Ecology)",
+        "layer4": "多Agent集群 — 7 模块 (Swarm/Trust/Ecology/Protocol/NodeRegistry/MetricsCollector/FailureDetector)",
+        "genome": "知识传承 — 4 模块 (Heritage/Cache/EvolutionTracker/EnterpriseKnowledge)"
+      }
+    }
   },
   "capabilities": {
-    "eventbus": [
-      "发布/订阅",
-      "优先级队列",
-      "死信队列",
-      "条件引擎",
-      "事件追踪",
-      "指标聚合"
-    ],
-    "genome": [
-      "知识图谱",
-      "语义搜索",
-      "版本管理",
-      "质量评估",
-      "模式挖掘",
-      "IQ评估"
-    ],
-    "strategy": [
-      "策略评估",
-      "策略切换",
-      "策略注册",
-      "多策略支持"
-    ],
-    "layer1": [
-      "健康检查",
-      "系统监控",
-      "磁盘监控",
-      "进程监控",
-      "Agent监控",
-      "网关监控",
-      "服务监控"
-    ],
-    "layer2": [
-      "自适应调优",
-      "自修复",
-      "市场发现",
-      "ML引擎",
-      "紧急响应",
-      "状态收集",
-      "分析响应"
-    ],
-    "layer3": [
-      "DAG编排",
-      "任务市场",
-      "任务注册",
-      "任务协调",
-      "调度器",
-      "N8N集成",
-      "上下文管理"
-    ],
-    "layer4": [
-      "Swarm集群",
-      "信任评估",
-      "生态管理",
-      "协议",
-      "节点发现",
-      "信任撤销"
-    ],
-    "hermes_bridge": [
-      "Hermes事件消费",
-      "Hermes洞察同步",
-      "场景集成"
-    ]
+    "cloud": ["事件持久化与广播", "跨Edge任务共享", "技能市场", "节点管理", "全局调度", "进化引擎", "复盘引擎", "广播引擎"],
+    "edge": ["环境自动检测", "IDE桥接调度", "生态组件管理", "云端同步", "框架适配", "健康上报"],
+    "exoskeleton": ["系统健康监控", "自修复", "工程控制论反馈闭环", "任务编排DAG", "信任评估", "生态位匹配"]
   },
-  "integration": {
-    "n8n": [
-      "工作流触发",
-      "Webhook接收",
-      "消息队列",
-      "定时任务"
-    ],
-    "obsidian": [
-      "双向同步",
-      "图谱构建",
-      "链接发现",
-      "语义分析"
-    ],
-    "memOS": [
-      "记忆同步",
-      "洞察消费",
-      "知识图谱更新"
-    ],
-    "外部工具": [
-      "Aliyun ECS",
-      "DingTalk",
-      "Wiki",
-      "News"
-    ]
-  },
-  "cli": {
-    "bin/clawshell": "主入口CLI",
-    "bin/clawsync": "Hermes同步脚本"
-  },
-  "clawshell_version": "1.0.0",
-  "manifest_version": "1.0"
+  "principles": [
+    "异构同效", "无侵入", "低耦合", "高鲁棒", "高泛用", "高协同",
+    "可移植", "幂等性", "端-云版本解耦"
+  ],
+  "philosophy": "工程控制论 — 信息反馈、动态调控、系统整体思维",
+  "manifest_version": "2.0"
 }
