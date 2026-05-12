@@ -27,6 +27,7 @@ _review = None
 _broadcast = None
 _n8n_bridge = None
 _insight = None  # v1.9.0 InsightEngine
+_brain = None    # v1.12.0 CloudBrain LLM analyst
 
 
 def set_engines(**kwargs):
@@ -41,7 +42,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="ClawShell Cloud Hub",
         description="一云多端云边协同分布式神经系统 — Cloud Hub API",
-        version="1.9",
+        version="1.12",
         docs_url="/docs" if config.debug else None,
         redoc_url=None,
     )
@@ -74,6 +75,7 @@ def create_app() -> FastAPI:
                 "broadcast": "active" if _broadcast else "inactive",
                 "n8n": "active" if _n8n_bridge else "inactive",
                 "insight": "active" if _insight else "inactive",  # v1.9.0
+                "brain": "active" if _brain else "inactive",  # v1.12.0
             },
             "edges_online": _swarm.online_count() if _swarm else 0,
         }
@@ -86,6 +88,7 @@ def create_app() -> FastAPI:
     from cloud.routers.insights_broadcasts_reviews import (
         insights_router, broadcasts_router, reviews_router, evolution_router
     )
+    from cloud.routers.brain import brain_router  # v1.12.0
 
     app.include_router(events_router, prefix="/api/v1")
     app.include_router(nodes_router, prefix="/api/v1")
@@ -95,6 +98,7 @@ def create_app() -> FastAPI:
     app.include_router(broadcasts_router, prefix="/api/v1")
     app.include_router(reviews_router, prefix="/api/v1")
     app.include_router(evolution_router, prefix="/api/v1")
+    app.include_router(brain_router, prefix="/api/v1")  # v1.12.0
 
     return app
 
@@ -114,11 +118,13 @@ def init_engines():
     from cloud.engines.broadcast import BroadcastEngine
     from cloud.engines.n8n_bridge import N8NBridge
     from cloud.engines.insight import InsightEngine  # v1.9.0
+    from cloud.brain.analyst import CloudAnalyst  # v1.12.0
 
     global _eventbus, _scheduler, _capability_registry
     global _task_board, _skill_market, _swarm
     global _evolution, _review, _broadcast, _n8n_bridge
     global _insight  # v1.9.0
+    global _brain    # v1.12.0
 
     _eventbus = CloudEventBus(data_dir=config.data_dir)
     _eventbus.start_cleanup_daemon()
@@ -154,7 +160,11 @@ def init_engines():
     _insight = InsightEngine(eventbus=_eventbus, data_dir=config.data_dir)
     _insight.start()
 
-    logging.info("All 10 cloud engines initialized (v1.9.0)")
+    # v1.12.0 — CloudBrain: LLM-powered analysis (event-driven + periodic)
+    _brain = CloudAnalyst(eventbus=_eventbus, data_dir=config.data_dir)
+    _brain.start()
+
+    logging.info(f"All 11 engines initialized (v1.12.0) — Brain LLM: {_brain._llm.is_configured}")
 
 
 def main():
