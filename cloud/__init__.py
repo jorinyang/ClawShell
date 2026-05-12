@@ -1,7 +1,7 @@
 """Cloud Hub package.
 
 Exports all cloud engines, services, and API components.
-v1.8.1: Added Eventing infrastructure (EventStore, Tracer, DLQ, etc.)
+v1.8.1: Added Eventing infrastructure + new engines (Workflow/Optimizer/DeepThink/KnowledgeGraph)
 """
 
 from cloud.config import config
@@ -32,6 +32,22 @@ from cloud.eventing import (
     QualityEvaluator, QualityScore, QualityLevel,
 )
 
+# v1.8.1 New engines
+from cloud.engines.workflow import (
+    WorkflowEngine, Workflow, Step, Execution,
+    StepType, ExecutionStatus,
+)
+from cloud.engines.optimizer import (
+    GlobalOptimizer, OptimizationGoal, ResourceType,
+    ResourceQuota, AllocationPlan, OptimizationResult, CostModel,
+)
+from cloud.engines.deep_think import (
+    DeepThinkEngine, ThinkNode, ThinkResult,
+)
+from cloud.services.knowledge_graph import (
+    KnowledgeGraph, Entity, Relation, GraphQuery, SearchResult,
+)
+
 __all__ = [
     "config",
     "CloudEventBus",
@@ -57,4 +73,11 @@ __all__ = [
     "PatternMiner", "Pattern", "MiningResult",
     "MLEngine", "AnomalyResult", "TrendResult",
     "QualityEvaluator", "QualityScore", "QualityLevel",
+    # New engines
+    "WorkflowEngine", "Workflow", "Step", "Execution",
+    "StepType", "ExecutionStatus",
+    "GlobalOptimizer", "OptimizationGoal", "ResourceType",
+    "ResourceQuota", "AllocationPlan", "OptimizationResult", "CostModel",
+    "DeepThinkEngine", "ThinkNode", "ThinkResult",
+    "KnowledgeGraph", "Entity", "Relation", "GraphQuery", "SearchResult",
 ]
