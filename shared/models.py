@@ -35,6 +35,36 @@ class TrustLevel(str):
     HIGH = "high"
     FULL = "full"
 
+class EventCategory(str):
+    """Event categories matching cloud/edge event patterns."""
+    TASK = "task"
+    NODE = "node"
+    INSIGHT = "insight"
+    STRATEGY = "strategy"
+    ERROR = "error"
+    SYSTEM = "system"
+    MEMORY = "memory"
+    KNOWLEDGE = "knowledge"
+
+class EventPriority:
+    """Event priority levels (int-based, higher = more urgent)."""
+    LOW = 0
+    NORMAL = 50
+    HIGH = 80
+    CRITICAL = 100
+
+class TaskStatusClass:
+    """Task status constants (matches old types.py TaskStatus Enum)."""
+    PENDING = "pending"
+    ASSIGNED = "assigned"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+    TIMEOUT = "timeout"
+
+TaskStatus = TaskStatusClass  # Alias for backward compat
+
 class RepairLayer(str):
     SELF_HEALING = "self_healing"
     AUTO_REPAIR = "auto_repair"

@@ -249,6 +249,28 @@ class CloudEventBus:
             self._notify_subscribers(event)
         return accepted
 
+    def pop_priority(self):
+        with self._lock:
+            if not self._priority_queue:
+                return None
+            neg_priority, ts, eid = heapq.heappop(self._priority_queue)
+            event = self._events.get(eid)
+            if event and self._is_expired(event):
+                self._dropped_count += 1
+                return None
+            if event:
+                self._processed_count += 1
+            return event
+
+    def _is_expired(self, event):
+        if not self._ttl_enabled:
+            return False
+        ttl = event.get("ttl_seconds", 0)
+        if ttl <= 0:
+            return False
+        age = time.time() - event.get("timestamp", time.time())
+        return age > ttl
+
     def _notify_subscribers(self, event):
         event_type = event.get('event_type', '')
         category = event_type.split('.')[0] if '.' in event_type else event_type

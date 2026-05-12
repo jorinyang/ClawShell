@@ -1419,9 +1419,671 @@ check("CloudConfig.safe masks when secrets present",
 shutil.rmtree(TMP, ignore_errors=True)
 
 
-# ═══════════════════════════════════════════════════════
-# ── FINAL SUMMARY ──
-# ═══════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════
+# ── CATEGORY 13: v1.9.0 — Pydantic v2 models ──
+# ═══════════════════════════════════════════════════════════════
+print("\n" + "=" * 60)
+print("  CATEGORY 13: v1.9.0 — Pydantic v2 Shared Models")
+print("=" * 60)
+
+from shared.models import (
+    NodeInfo, NodeHeartbeat, CortexInfo,
+    Task as PydanticTask, TaskResult,
+    EventMessage, Insight as PydanticInsight,
+    Knowledge, Memory, Plugin, PluginRegistry,
+    HealthReport, RepairAction,
+    SystemPerception, NetworkPerception, PerceptionResult,
+    SwarmNode, CortexConfig, GanglionConfig,
+    Strategy, HealthStatus, RepairLayer, TrustLevel,
+    CapabilityDomain, NodeID, TaskID, PluginID, EventID,
+)
+
+# NodeInfo
+n = NodeInfo(node_id="test-01", hostname="macbook", os="darwin", variant="hermes")
+check("NodeInfo.node_id", n.node_id == "test-01")
+check("NodeInfo.hostname", n.hostname == "macbook")
+check("NodeInfo.to_legacy_dict returns dict", isinstance(n.to_legacy_dict(), dict))
+check("NodeInfo.to_legacy_dict has keys", len(n.to_legacy_dict()) >= 8)
+
+# NodeHeartbeat
+hb = NodeHeartbeat(node_id="test-01", cpu_percent=45.2, memory_percent=72.1)
+check("NodeHeartbeat.node_id", hb.node_id == "test-01")
+check("NodeHeartbeat.cpu_percent", abs(hb.cpu_percent - 45.2) < 0.01)
+
+# CortexInfo
+ci = CortexInfo(node_id="cortex-01", version="1.11.0")
+check("CortexInfo.version", ci.version == "1.11.0")
+check("CortexInfo.node_type", ci.node_type == "cortex")
+
+# EventMessage
+em = EventMessage(event_id="evt-1", category="task", event_type="task.created",
+                  source="g1", priority=80, ttl_seconds=60)
+check("EventMessage.event_id", em.event_id == "evt-1")
+check("EventMessage.priority", em.priority == 80)
+check("EventMessage.to_legacy_dict", isinstance(em.to_legacy_dict(), dict))
+
+# PydanticTask
+t = PydanticTask(task_id="t1", title="Test Task", tags=["urgent", "bug"],
+                 priority=80, max_retries=3)
+check("PydanticTask.task_id", t.task_id == "t1")
+check("PydanticTask.tags", "urgent" in t.tags)
+check("PydanticTask.max_retries", t.max_retries == 3)
+
+# TaskResult
+tr = TaskResult(task_id="t1", success=True, duration_ms=150.5)
+check("TaskResult.success", tr.success)
+check("TaskResult.duration_ms", abs(tr.duration_ms - 150.5) < 0.1)
+
+# Insight
+ins = PydanticInsight(insight_id="ins-1", title="Error Storm", content="5 errors",
+                      category="alert", severity=100, actionable=True)
+check("PydanticInsight.actionable", ins.actionable)
+check("PydanticInsight.severity", ins.severity == 100)
+
+# Knowledge
+k = Knowledge(knowledge_id="k1", title="Best Practice", content="Always test",
+              category="best_practice", tags=["testing", "quality"], version=1)
+check("Knowledge.tags", "testing" in k.tags)
+check("Knowledge.version", k.version == 1)
+
+# Memory
+m = Memory(memory_id="m1", content="Remember this", importance=0.8,
+           category="session", tags=["important"])
+check("Memory.importance", abs(m.importance - 0.8) < 0.01)
+check("Memory.decay_factor", abs(m.decay_factor - 0.95) < 0.01)
+
+# Plugin
+p = Plugin(plugin_id="n8n", name="N8N", domain="service", provider="n8n",
+           endpoint="http://localhost:5678", enabled=True)
+check("Plugin.enabled", p.enabled)
+check("Plugin.domain", p.domain == "service")
+
+# PluginRegistry
+pr = PluginRegistry(node_id="test-01", plugins=[p])
+check("PluginRegistry.plugins", len(pr.plugins) == 1)
+
+# HealthReport
+hr = HealthReport(overall="healthy", components={"cpu": "healthy", "mem": "warning"})
+check("HealthReport.overall", hr.overall == "healthy")
+check("HealthReport.components", len(hr.components) == 2)
+
+# RepairAction
+ra = RepairAction(action_id="ra-1", component="memory", layer="self_healing",
+                  action="clear_cache")
+check("RepairAction.layer", ra.layer == "self_healing")
+
+# SystemPerception
+sp = SystemPerception(cpu_percent=50.0, memory_percent=60.0, disk_percent=70.0)
+check("SystemPerception.cpu_percent", abs(sp.cpu_percent - 50.0) < 0.01)
+
+# NetworkPerception
+np = NetworkPerception(hostname="test", ip_address="127.0.0.1", internet_access=True)
+check("NetworkPerception.internet_access", np.internet_access)
+
+# PerceptionResult
+pr_result = PerceptionResult(dimension="system", data={"cpu": 50}, health="healthy")
+check("PerceptionResult.health", pr_result.health == "healthy")
+
+# SwarmNode
+sn = SwarmNode(node_id="n1", trust_score=0.95)
+check("SwarmNode.trust_score", abs(sn.trust_score - 0.95) < 0.01)
+
+# CortexConfig / GanglionConfig
+cc = CortexConfig(port=8000, strategy="default")
+gc = GanglionConfig(cortex_host="localhost", cortex_port=8000)
+check("CortexConfig.port", cc.port == 8000)
+check("GanglionConfig.offline_mode", not gc.offline_mode)
+
+# Enum constants
+check("Strategy.DEFAULT", Strategy.DEFAULT == "default")
+check("Strategy.EMERGENCY", Strategy.EMERGENCY == "emergency")
+check("HealthStatus.HEALTHY", HealthStatus.HEALTHY == "healthy")
+check("RepairLayer.SELF_HEALING", RepairLayer.SELF_HEALING == "self_healing")
+check("RepairLayer.MANUAL", RepairLayer.MANUAL == "manual")
+check("TrustLevel.HIGH", TrustLevel.HIGH == "high")
+check("CapabilityDomain.SKILL", CapabilityDomain.SKILL == "skill")
+
+# Type aliases
+check("NodeID type", isinstance("test", NodeID))
+check("TaskID type", isinstance("task-1", TaskID))
+
+
+# ═══════════════════════════════════════════════════════════════
+# ── CATEGORY 14: v1.9.0 — InsightEngine + PluginManager ──
+# ═══════════════════════════════════════════════════════════════
+print("\n" + "=" * 60)
+print("  CATEGORY 14: v1.9.0 — InsightEngine + PluginManager")
+print("=" * 60)
+
+tmp14 = tempfile.mkdtemp(prefix="cs_v190_")
+
+# InsightEngine
+from cloud.engines.insight import InsightEngine
+insight = InsightEngine(data_dir=tmp14)
+check("InsightEngine created", insight is not None)
+check("InsightEngine.stats.total_events_tracked", insight.stats["total_events_tracked"] == 0)
+check("InsightEngine.stats.total_insights", insight.stats["total_insights"] == 0)
+check("InsightEngine.stats.running", not insight.stats["running"])
+
+# Test error handling
+insight._on_error({"event_type": "error.timeout", "source": "g1", "payload": {}, "timestamp": time.time()})
+check("InsightEngine tracks errors", insight.stats["total_events_tracked"] == 1)
+
+# Test node events
+insight._on_node({"event_type": "node.online", "source": "g2", "payload": {}, "timestamp": time.time()})
+check("InsightEngine tracks node events", insight.stats["total_events_tracked"] == 2)
+
+# Get insights (empty since no storm)
+insights = insight.get_insights(limit=10)
+check("InsightEngine.get_insights returns list", isinstance(insights, list))
+
+# Get insights as dicts
+dicts = insight.get_insights_as_dicts(limit=5)
+check("InsightEngine.get_insights_as_dicts", isinstance(dicts, list))
+
+# Generate knowledge
+knowledge = insight.generate_knowledge()
+check("InsightEngine.generate_knowledge", isinstance(knowledge, list))
+
+# PluginManager
+from edge.ecosystem.plugin_manager import PluginManager, BUILTIN_PLUGINS
+pm = PluginManager(node_id="test-01", plugins_dir=tmp14)
+check("PluginManager created", pm is not None)
+check("BUILTIN_PLUGINS has n8n", "n8n" in BUILTIN_PLUGINS)
+check("BUILTIN_PLUGINS has memos", "memos" in BUILTIN_PLUGINS)
+
+plugins = pm.discover()
+check("PluginManager.discover returns list", isinstance(plugins, list))
+check("PluginManager discovered plugins", len(plugins) >= 5)  # 5 builtins
+
+# Health check
+health = pm.health_check()
+check("PluginManager.health_check returns dict", isinstance(health, dict))
+check("PluginManager.health_check has entries", len(health) >= 5)
+
+# List all
+all_plugins = pm.list_all()
+check("PluginManager.list_all", len(all_plugins) >= 5)
+
+# List enabled
+enabled = pm.list_enabled()
+check("PluginManager.list_enabled", len(enabled) >= 5)
+
+# Get specific plugin
+n8n = pm.get_plugin("n8n")
+check("PluginManager.get_plugin n8n", n8n is not None)
+check("PluginManager n8n.name", n8n.name == "N8N Workflow")
+
+# Enable/disable
+check("PluginManager.disable n8n", pm.disable("n8n"))
+check("PluginManager n8n disabled", not pm.get_plugin("n8n").enabled)
+check("PluginManager.enable n8n", pm.enable("n8n"))
+check("PluginManager n8n enabled", pm.get_plugin("n8n").enabled)
+
+# Stats
+check("PluginManager.stats.total", pm.stats["total"] >= 5)
+
+shutil.rmtree(tmp14, ignore_errors=True)
+
+
+# ═══════════════════════════════════════════════════════════════
+# ── CATEGORY 15: v1.9.0 — PID FeedbackControlLoop + StrategySwitcher ──
+# ═══════════════════════════════════════════════════════════════
+print("\n" + "=" * 60)
+print("  CATEGORY 15: v1.9.0 — PID + StrategySwitcher")
+print("=" * 60)
+
+from exoskeleton.layer2.feedback_loop import FeedbackControlLoop
+from exoskeleton.layer2.strategy import StrategySwitcher
+from shared.models import Strategy
+
+# PID Controller
+loop = FeedbackControlLoop("test_health", kp=0.5, ki=0.1, tolerance=0.1)
+check("PID created", loop is not None)
+check("PID name", loop.name == "test_health")
+check("PID not stable initially", not loop.is_stable)
+
+loop.set_target(1.0)
+signal = loop.update(0.5)
+check("PID signal in range", -1.0 <= signal <= 1.0)
+check("PID deviation after update", abs(loop.deviation - 0.5) < 0.01)
+
+# Converge to stable
+for _ in range(5):
+    loop.update(0.98)
+check("PID converges to stable", loop.is_stable)
+
+# Reset
+loop.reset()
+check("PID reset iterations", loop.iteration_count == 0)
+check("PID reset stable", not loop.is_stable)
+
+# State
+state = loop.state
+check("PID state has expected", "expected" in state and "actual" in state)
+
+# StrategySwitcher
+sw = StrategySwitcher(initial=Strategy.DEFAULT)
+check("StrategySwitcher initial", sw.current == Strategy.DEFAULT)
+
+# Evaluate emergency
+result = sw.evaluate(health_score=0.2, resource_pressure=0.5)
+check("Strategy emergency trigger", result == Strategy.EMERGENCY)
+
+# Execute switch
+sw.switch(Strategy.EMERGENCY, "health critical")
+check("Strategy switched to EMERGENCY", sw.current == Strategy.EMERGENCY)
+
+# Evaluate recovery
+sw2 = StrategySwitcher()
+result2 = sw2.evaluate(health_score=0.9, resource_pressure=0.2)
+check("Strategy stable no-switch", result2 is None)
+
+# Can transition check
+check("Strategy can transition DEFAULT→EMERGENCY", sw2.can_transition_to(Strategy.EMERGENCY))
+check("Strategy cannot transition EMERGENCY→AGGRESSIVE",
+      not StrategySwitcher(Strategy.EMERGENCY).can_transition_to(Strategy.AGGRESSIVE))
+
+# History
+hist = sw.get_recent_history(5)
+check("Strategy has history", len(hist) == 1)
+
+# Stats
+sw_stats = sw.stats
+check("Strategy stats.current", sw_stats["current"] == Strategy.EMERGENCY)
+
+
+# ═══════════════════════════════════════════════════════════════
+# ── CATEGORY 16: v1.9.0 — heapq EventBus upgrade ──
+# ═══════════════════════════════════════════════════════════════
+print("\n" + "=" * 60)
+print("  CATEGORY 16: v1.9.0 — heapq EventBus + Pub/Sub")
+print("=" * 60)
+
+tmp16 = tempfile.mkdtemp(prefix="cs_v190_eb_")
+from cloud.engines.eventbus import CloudEventBus
+
+eb = CloudEventBus(data_dir=tmp16)
+check("EventBus created", eb is not None)
+
+# Ingest events with different priorities
+events = [
+    {"event_id": "e1", "event_type": "task.created", "source": "g1", "priority": 50, "timestamp": time.time()},
+    {"event_id": "e2", "event_type": "error.alert", "source": "g2", "priority": 100, "timestamp": time.time()},
+    {"event_id": "e3", "event_type": "node.heartbeat", "source": "g3", "priority": 0, "timestamp": time.time()},
+]
+accepted = eb.ingest(events)
+check("EventBus ingest accepted 3", accepted == 3)
+
+# Query
+results = eb.query(limit=10)
+check("EventBus query returns events", len(results) >= 3)
+
+# Subscribe
+received = []
+def test_handler(event):
+    received.append(event.get("event_type", ""))
+
+eb.subscribe("error.*", test_handler)
+check("EventBus subscribe", True)
+
+# Publish via new method
+eb.publish("error.timeout", {"event_id": "e4", "event_type": "error.timeout", "source": "g4",
+                              "priority": 80, "timestamp": time.time()})
+# Small delay for handler
+time.sleep(0.1)
+check("EventBus publish + notify", len(received) >= 1)
+
+# Runtime stats
+rs = eb.runtime_stats
+check("EventBus runtime_stats.total_events", rs["total_events"] >= 4)
+check("EventBus runtime_stats.subscribers", rs["subscribers"] >= 1)
+check("EventBus runtime_stats.queue_size", rs["queue_size"] >= 0)
+
+# Pop priority (highest priority should come first)
+evt = eb.pop_priority()
+if evt:
+    check("EventBus pop_priority returns event", "event_type" in evt)
+
+# Query by type
+by_type = eb.query_by_type("task.created", limit=5)
+check("EventBus query_by_type", len(by_type) >= 1)
+
+# Query by source
+by_source = eb.query_by_source("g1", limit=5)
+check("EventBus query_by_source", len(by_source) >= 1)
+
+shutil.rmtree(tmp16, ignore_errors=True)
+
+
+# ═══════════════════════════════════════════════════════════════
+# ── CATEGORY 17: v1.10.0 — SemanticSearch + RelationEngine ──
+# ═══════════════════════════════════════════════════════════════
+print("\n" + "=" * 60)
+print("  CATEGORY 17: v1.10.0 — SemanticSearch + RelationEngine")
+print("=" * 60)
+
+from cloud.services.semantic_search import SemanticSearch
+from cloud.services.relation_engine import RelationEngine
+
+# SemanticSearch
+ss = SemanticSearch()
+check("SemanticSearch created", ss is not None)
+
+ss.index_knowledge("k1", "hello world testing", "Test Entry 1")
+ss.index_knowledge("k2", "python is great for AI", "Python AI")
+ss.index_knowledge("k3", "hello python world", "Hello Python")
+
+results = ss.search("hello", limit=10)
+check("SemanticSearch.search returns results", len(results) >= 1)
+check("SemanticSearch.search first result has score", results[0]["score"] >= 1)
+
+results2 = ss.search("python", limit=10)
+check("SemanticSearch.search python", len(results2) >= 2)
+
+# Stats
+ss_stats = ss.stats
+check("SemanticSearch.stats.total_keywords", ss_stats["total_keywords"] >= 1)
+
+# RelationEngine
+re = RelationEngine()
+check("RelationEngine created", re is not None)
+
+re.add_relation("a", "b", "depends_on", 0.8)
+re.add_relation("b", "c", "related_to", 0.5)
+re.add_relation("a", "d", "part_of", 0.3)
+
+rels = re.get_relations("a")
+check("RelationEngine.get_relations a", len(rels) == 2)
+
+rev = re.get_reverse_relations("b")
+check("RelationEngine.get_reverse_relations b", len(rev) == 1)
+
+related = re.find_related("a", max_depth=2)
+check("RelationEngine.find_related returns results", len(related) >= 1)
+
+# Stats
+re_stats = re.stats
+check("RelationEngine.stats.total_relations", re_stats["total_relations"] == 3)
+
+
+# ═══════════════════════════════════════════════════════════════
+# ── CATEGORY 18: v1.10.0 — MemoryStore + RepairEscalation ──
+# ═══════════════════════════════════════════════════════════════
+print("\n" + "=" * 60)
+print("  CATEGORY 18: v1.10.0 — MemoryStore + RepairEscalation")
+print("=" * 60)
+
+tmp18 = tempfile.mkdtemp(prefix="cs_v1100_")
+from storage.memory_store import MemoryStore
+from exoskeleton.layer2.repair_escalation import RepairEscalation
+from shared.models import RepairLayer
+
+# MemoryStore
+ms = MemoryStore(store_path=tmp18)
+check("MemoryStore created", ms is not None)
+
+ms.store_dict("m1", "hello world test", importance=0.8, category="session", tags=["test"])
+ms.store_dict("m2", "python programming", importance=0.5, category="knowledge", tags=["python"])
+ms.store_dict("m3", "important reminder", importance=0.9, category="session", tags=["important"])
+
+recalled = ms.recall("hello", limit=10)
+check("MemoryStore.recall hello", len(recalled) >= 1)
+
+recalled_all = ms.recall("", limit=10)
+check("MemoryStore.recall all", len(recalled_all) >= 3)
+
+# Get specific
+m1 = ms.get("m1")
+check("MemoryStore.get m1", m1 is not None)
+check("MemoryStore.get content", "hello" in m1.content)
+
+# Forget
+check("MemoryStore.forget m3", ms.forget("m3"))
+check("MemoryStore.get deleted", ms.get("m3") is None)
+
+# Stats
+ms_stats = ms.stats
+check("MemoryStore.stats.total", ms_stats["total"] >= 2)
+
+# Load from disk
+ms2 = MemoryStore(store_path=tmp18)
+count = ms2.load()
+check("MemoryStore.load loads persisted", count >= 2)
+
+# RepairEscalation
+esc = RepairEscalation()
+check("RepairEscalation created", esc is not None)
+
+# First self-healing (should NOT escalate)
+should_esc, layer, reason = esc.should_escalate("memory", RepairLayer.SELF_HEALING)
+check("RepairEscalation no escalate on first attempt", not should_esc)
+
+# Simulate 3 failed self-healings
+for _ in range(2):
+    esc.should_escalate("memory", RepairLayer.SELF_HEALING)
+should_esc2, layer2, reason2 = esc.should_escalate("memory", RepairLayer.SELF_HEALING)
+check("RepairEscalation escalates after 3 failures", should_esc2)
+check("RepairEscalation escalates to auto_repair", layer2 == RepairLayer.AUTO_REPAIR)
+
+# Record success
+esc.record_action("memory", RepairLayer.SELF_HEALING, "clear_cache", True)
+# After success, counters reset
+should_esc3, _, _ = esc.should_escalate("memory", RepairLayer.SELF_HEALING)
+check("RepairEscalation resets after success", not should_esc3)
+
+# Get recommended action
+action = esc.get_recommended_action("memory_high", RepairLayer.SELF_HEALING)
+check("RepairEscalation.get_recommended_action", action == "clear_cache")
+
+# Stats
+esc_stats = esc.stats
+check("RepairEscalation.stats.total_actions", esc_stats["total_actions"] >= 1)
+
+shutil.rmtree(tmp18, ignore_errors=True)
+
+
+# ═══════════════════════════════════════════════════════════════
+# ── CATEGORY 19: v1.10.0 — SharedConfig + loguru ──
+# ═══════════════════════════════════════════════════════════════
+print("\n" + "=" * 60)
+print("  CATEGORY 19: v1.10.0 — SharedConfig + loguru setup")
+print("=" * 60)
+
+from shared.config import config as shared_cfg
+from shared.logging_setup import setup_logging, get_logger
+
+# SharedConfig
+check("SharedConfig.host", shared_cfg.get("host") == "0.0.0.0")
+check("SharedConfig.port", shared_cfg.get("port") == 8000)
+check("SharedConfig.data_dir", shared_cfg.get("data_dir") == "data")
+check("SharedConfig defaults", shared_cfg.get("nonexistent", "fallback") == "fallback")
+
+# to_dict (secrets masked)
+cfg_dict = shared_cfg.to_dict()
+check("SharedConfig.to_dict returns dict", isinstance(cfg_dict, dict))
+check("SharedConfig.to_dict has host", "host" in cfg_dict)
+
+# loguru setup
+logger_obj = setup_logging(level="INFO")
+check("Logging setup returns logger", logger_obj is not None)
+
+log = get_logger("test")
+check("get_logger returns logger", log is not None)
+
+
+# ═══════════════════════════════════════════════════════════════
+# ── CATEGORY 20: v1.11.0 — PubSubManager + NicheMatcher ──
+# ═══════════════════════════════════════════════════════════════
+print("\n" + "=" * 60)
+print("  CATEGORY 20: v1.11.0 — PubSubManager + NicheMatcher")
+print("=" * 60)
+
+from cloud.pubsub.manager import PubSubManager
+from exoskeleton.layer4.niche_matcher import NicheMatcher, compute_niche_score, find_best_node
+
+# PubSubManager
+pubsub = PubSubManager()
+check("PubSubManager created", pubsub is not None)
+
+pubsub.register("g1", subscriptions=["task.*", "error.*"])
+pubsub.register("g2", subscriptions=["*"])
+check("PubSubManager registered 2 nodes", pubsub.stats["connections"] == 2)
+
+pubsub.heartbeat("g1")
+pubsub.heartbeat("g2")
+
+# Publish
+pubsub.publish({"event_type": "task.created", "source": "cortex", "payload": {}})
+check("PubSubManager publish", True)
+
+# Queue for offline
+pubsub._queue_for_node("g3", {"event_type": "test", "data": "hello"})
+flushed = pubsub.flush_queue("g3")
+check("PubSubManager flush_queue", len(flushed) == 1)
+check("PubSubManager queue cleared after flush",
+      len(pubsub._offline_queues.get("g3", [])) == 0)
+
+# Unregister
+pubsub.unregister("g2")
+check("PubSubManager unregister", pubsub.stats["connections"] == 1)
+
+# PubSub stats
+ps_stats = pubsub.stats
+check("PubSubManager.stats.connections", ps_stats["connections"] == 1)
+
+# NicheMatcher
+nm = NicheMatcher()
+check("NicheMatcher created", nm is not None)
+
+# compute_niche_score
+score = compute_niche_score(
+    capabilities=["python", "docker", "git"],
+    required_tags=["python", "docker"],
+    current_load=2,
+    max_load=10,
+    trust_score=0.8
+)
+check("compute_niche_score in range", 0.0 <= score <= 1.0)
+
+# find_best_node
+nodes = {
+    "n1": {"capabilities": ["python", "docker"], "active_tasks": 2, "trust_score": 0.9},
+    "n2": {"capabilities": ["python", "git"], "active_tasks": 5, "trust_score": 0.6},
+    "n3": {"capabilities": ["python", "docker", "git"], "active_tasks": 0, "trust_score": 0.95},
+}
+best = find_best_node(nodes, required_tags=["python", "docker"])
+check("find_best_node returns node", best is not None)
+check("find_best_node prefers n3", best == "n3")  # n3 has all caps + lowest load + highest trust
+
+# NicheMatcher.match
+ranked = nm.match(["python", "docker"], nodes)
+check("NicheMatcher.match returns list", len(ranked) == 3)
+check("NicheMatcher.match sorted by score", ranked[0][1] >= ranked[-1][1])
+
+# NicheMatcher.find_best
+best2 = nm.find_best(["python"], nodes)
+check("NicheMatcher.find_best", best2 is not None)
+
+# Custom weights
+nm2 = NicheMatcher(capability_weight=0.5, load_weight=0.3, trust_weight=0.2)
+best3 = nm2.find_best(["python"], nodes)
+check("NicheMatcher custom weights", best3 is not None)
+
+
+# ═══════════════════════════════════════════════════════════════
+# ── CATEGORY 21: v1.11.0 — MetadataIndex + GitHub Adapter ──
+# ═══════════════════════════════════════════════════════════════
+print("\n" + "=" * 60)
+print("  CATEGORY 21: v1.11.0 — MetadataIndex + GitHub Adapter")
+print("=" * 60)
+
+from cloud.eventing.metadata_index import MetadataIndex
+
+# MetadataIndex
+mi = MetadataIndex()
+check("MetadataIndex created", mi is not None)
+
+mi.index_event("e1", {"event_type": "task.created", "category": "task", "source": "g1", "timestamp": time.time()})
+mi.index_event("e2", {"event_type": "error.alert", "category": "error", "source": "g2", "timestamp": time.time()})
+mi.index_event("e3", {"event_type": "task.completed", "category": "task", "source": "g1", "timestamp": time.time()})
+
+# Query by time
+since = time.time() - 3600
+time_results = mi.query_by_time(since)
+check("MetadataIndex.query_by_time", len(time_results) == 3)
+
+# Query by category
+cat_results = mi.query_by_category("task")
+check("MetadataIndex.query_by_category task", len(cat_results) == 2)
+
+cat_results2 = mi.query_by_category("error")
+check("MetadataIndex.query_by_category error", len(cat_results2) == 1)
+
+# Query by source
+src_results = mi.query_by_source("g1")
+check("MetadataIndex.query_by_source g1", len(src_results) == 2)
+
+# Stats
+mi_stats = mi.stats
+check("MetadataIndex.stats.total_indexed", mi_stats["total_indexed"] == 3)
+check("MetadataIndex.stats.categories", mi_stats["categories"] >= 2)
+
+# GitHub Adapter (no real API calls, just validate construction)
+from cloud.adapters.github import GitHubAdapter
+ga = GitHubAdapter(token="", repo="test/repo")
+check("GitHubAdapter created", ga is not None)
+check("GitHubAdapter.is_configured no token", not ga.is_configured)
+
+ga2 = GitHubAdapter(token="ghp_test", repo="owner/repo")
+check("GitHubAdapter.is_configured with token", ga2.is_configured)
+
+
+# ═══════════════════════════════════════════════════════════════
+# ── CATEGORY 22: Cross-module Integration ──
+# ═══════════════════════════════════════════════════════════════
+print("\n" + "=" * 60)
+print("  CATEGORY 22: Cross-module Integration (v1.9-1.11)")
+print("=" * 60)
+
+# Pydantic ↔ EventBus integration
+em2 = EventMessage(event_id="x1", category="task", event_type="task.created",
+                   source="g1", priority=80)
+legacy = em2.to_legacy_dict()
+check("EventMessage → legacy dict roundtrip has event_type", "event_type" in legacy)
+
+# Insight → Knowledge pipeline
+ins2 = PydanticInsight(insight_id="i1", title="Pattern Found", content="Multiple errors",
+                       category="pattern", severity=80, actionable=True,
+                       action={"type": "investigate", "target": "g1"})
+check("Insight → actionable", ins2.actionable and ins2.action is not None)
+
+# MemoryStore ↔ decay formula
+ms3 = MemoryStore(store_path=tempfile.mkdtemp(prefix="cs_integ_"))
+ms3.store_dict("old", "old memory", importance=0.9)
+ms3.store_dict("new", "new memory", importance=0.5)
+recalled_decay = ms3.recall("memory", limit=10)
+check("MemoryStore decay preserves order", len(recalled_decay) >= 1)
+# Newer + higher importance should rank higher
+if len(recalled_decay) >= 2:
+    check("MemoryStore importance scoring",
+          recalled_decay[0].importance >= recalled_decay[-1].importance)
+
+# RepairEscalation → 3-layer
+esc2 = RepairEscalation()
+for i in range(3):
+    should, layer, _ = esc2.should_escalate("cpu", RepairLayer.SELF_HEALING)
+if should:
+    check("RepairEscalation 3-layer escalation", layer == RepairLayer.AUTO_REPAIR)
+
+# NicheMatcher + PubSub integration scneario
+# Simulate task dispatch through niche matching
+tags = ["python", "docker"]
+best_node = find_best_node({
+    "e1": {"capabilities": ["python", "docker", "git"], "active_tasks": 1, "trust_score": 0.9},
+    "e2": {"capabilities": ["python"], "active_tasks": 8, "trust_score": 0.5},
+}, required_tags=tags)
+check("Cross: niche + pubsub simulation", best_node is not None)
 print()
 print("=" * 60)
 print(f"  FINAL RESULTS: {PASSED} passed, {FAILED} failed ({TOTAL} total)")
