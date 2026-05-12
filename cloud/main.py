@@ -26,6 +26,7 @@ _evolution = None
 _review = None
 _broadcast = None
 _n8n_bridge = None
+_insight = None  # v1.9.0 InsightEngine
 
 
 def set_engines(**kwargs):
@@ -40,7 +41,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="ClawShell Cloud Hub",
         description="一云多端云边协同分布式神经系统 — Cloud Hub API",
-        version="1.8",
+        version="1.9",
         docs_url="/docs" if config.debug else None,
         redoc_url=None,
     )
@@ -72,6 +73,7 @@ def create_app() -> FastAPI:
                 "review": "active" if _review else "inactive",
                 "broadcast": "active" if _broadcast else "inactive",
                 "n8n": "active" if _n8n_bridge else "inactive",
+                "insight": "active" if _insight else "inactive",  # v1.9.0
             },
             "edges_online": _swarm.online_count() if _swarm else 0,
         }
@@ -111,10 +113,12 @@ def init_engines():
     from cloud.engines.review import UnifiedReviewEngine
     from cloud.engines.broadcast import BroadcastEngine
     from cloud.engines.n8n_bridge import N8NBridge
+    from cloud.engines.insight import InsightEngine  # v1.9.0
 
     global _eventbus, _scheduler, _capability_registry
     global _task_board, _skill_market, _swarm
     global _evolution, _review, _broadcast, _n8n_bridge
+    global _insight  # v1.9.0
 
     _eventbus = CloudEventBus(data_dir=config.data_dir)
     _eventbus.start_cleanup_daemon()
@@ -146,7 +150,11 @@ def init_engines():
 
     _n8n_bridge = N8NBridge(n8n_base_url=config.n8n_url)
 
-    logging.info("All 9 cloud engines initialized")
+    # v1.9.0 — InsightEngine: real-time event analysis
+    _insight = InsightEngine(eventbus=_eventbus, data_dir=config.data_dir)
+    _insight.start()
+
+    logging.info("All 10 cloud engines initialized (v1.9.0)")
 
 
 def main():

@@ -16,10 +16,11 @@ import time
 import glob
 import fnmatch
 import hashlib
+import heapq
 import threading
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, List, Optional, Any, Tuple, Callable
 from datetime import datetime, timedelta
-from collections import defaultdict
+from collections import defaultdict, deque
 
 
 class CloudEventBus:
@@ -51,6 +52,13 @@ class CloudEventBus:
         self._by_type: Dict[str, List[str]] = defaultdict(list)  # type → [event_ids]
         self._by_source: Dict[str, List[str]] = defaultdict(list)  # source → [event_ids]
         self._stats: Dict[str, int] = defaultdict(int)
+
+        # v1.9.0
+        self._priority_queue: list = []
+        self._processed_count: int = 0
+        self._dropped_count: int = 0
+        self._subscribers: dict = defaultdict(list)
+        self._ttl_enabled: bool = True
 
         # Daemon control
         self._running = False
@@ -105,6 +113,11 @@ class CloudEventBus:
 
             if accepted > 0:
                 self._save_batch(list(self._events.values())[-accepted:])
+                for eid in list(self._events.keys())[-accepted:]:
+                    evt = self._events[eid]
+                    priority = evt.get("priority", 50)
+                    ts = evt.get("timestamp", time.time())
+                    heapq.heappush(self._priority_queue, (-priority, ts, eid))
 
             return accepted
 
@@ -223,7 +236,63 @@ class CloudEventBus:
         """Get recent broadcast events."""
         return self.query(event_type="broadcast", limit=limit)
 
-    # ── Daemon ────────────────────────────────────
+    # ── 
+    # v1.9.0 Pub/Sub
+
+    def subscribe(self, pattern, handler):
+        with self._lock:
+            self._subscribers[pattern].append(handler)
+
+    def publish(self, event_type, event):
+        accepted = self.ingest([event])
+        if accepted > 0:
+            self._notify_subscribers(event)
+        return accepted
+
+    def pop_priority(self):
+        with self._lock:
+            if not self._priority_queue:
+                return None
+            neg_priority, ts, eid = heapq.heappop(self._priority_queue)
+            event = self._events.get(eid)
+            if event and self._is_expired(event):
+                self._dropped_count += 1
+                return None
+            if event:
+                self._processed_count += 1
+            return event
+
+    def _is_expired(self, event):
+        if not self._ttl_enabled:
+            return False
+        ttl = event.get("ttl_seconds", 0)
+        if ttl <= 0:
+            return False
+        age = time.time() - event.get("timestamp", time.time())
+        return age > ttl
+
+    def _notify_subscribers(self, event):
+        event_type = event.get('event_type', '')
+        category = event_type.split('.')[0] if '.' in event_type else event_type
+        for pattern in (event_type, f'{category}.*', '*'):
+            for handler in self._subscribers.get(pattern, []):
+                try:
+                    handler(event)
+                except Exception:
+                    pass
+
+    @property
+    def runtime_stats(self):
+        with self._lock:
+            return {
+                'total_events': len(self._events),
+                'queue_size': len(self._priority_queue),
+                'subscribers': sum(len(v) for v in self._subscribers.values()),
+                'processed': self._processed_count,
+                'dropped': self._dropped_count,
+            }
+
+    # ── Daemon ─────────────────────────────────────
 
     def start_cleanup_daemon(self):
         """Start background cleanup daemon."""

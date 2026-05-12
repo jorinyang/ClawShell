@@ -1,0 +1,48 @@
+# Alibaba Cloud Function Compute deployment template
+# Deploy ClawShell insights + event processing as serverless functions
+# Tools: Serverless Devs (s) or Aliyun ROS
+
+ROSTemplateFormatVersion: '2015-09-01'
+Description: ClawShell Function Compute deployment
+
+Parameters:
+  ServiceName:
+    Type: String
+    Default: clawshell-fc
+  LogLevel:
+    Type: String
+    Default: INFO
+
+Resources:
+  # Insight Generator — periodic insight generation
+  InsightGenerator:
+    Type: 'ALIYUN::FC::Function'
+    Properties:
+      ServiceName: { Ref: ServiceName }
+      FunctionName: insight-generator
+      Handler: index.handler
+      Runtime: python3.10
+      Timeout: 60
+      MemorySize: 256
+      EnvironmentVariables:
+        LOG_LEVEL: { Ref: LogLevel }
+        CLAWSHELL_CORTEX_HOST: { Fn::GetAtt: [CortexAPI, InternetEndpoint] }
+  
+  # Event Batch Processor — async event processing  
+  EventBatchProcessor:
+    Type: 'ALIYUN::FC::Function'
+    Properties:
+      ServiceName: { Ref: ServiceName }
+      FunctionName: event-batch-processor
+      Handler: index.handler
+      Runtime: python3.10
+      Timeout: 30
+      MemorySize: 128
+      
+  # Cortex API Gateway
+  CortexAPI:
+    Type: 'ALIYUN::ApiGateway::Api'
+    Properties:
+      ApiName: clawshell-cortex
+      Protocol: HTTP
+      Visibility: PUBLIC

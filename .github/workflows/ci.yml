@@ -1,0 +1,40 @@
+name: ClawShell CI
+
+on:
+  push:
+    branches: [main, feature/*]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.10', '3.11', '3.12']
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install dependencies
+      run: |
+        pip install pydantic pyyaml websockets aiohttp requests psutil
+        pip install pytest pytest-asyncio pytest-cov ruff mypy
+    
+    - name: Lint with ruff
+      run: ruff check cloud/ edge/ shared/ exoskeleton/ storage/
+    
+    - name: Type check with mypy
+      run: mypy cloud/ edge/ shared/ exoskeleton/ storage/ --ignore-missing-imports || true
+    
+    - name: Run comprehensive tests
+      run: |
+        PYTHONPATH=. timeout 120 python3 tests/test_comprehensive.py
+    
+    - name: Run pytest
+      run: pytest tests/ -v --tb=short

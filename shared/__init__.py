@@ -33,6 +33,21 @@ from shared.utils import (
     content_hash, timestamp_now, safe_json_dumps, safe_json_loads,
     validate_node_id, generate_node_id, match_wildcard,
 )
+# v1.9.0 — Pydantic v2 models (additive, backward compatible)
+from shared.models import (
+    NodeInfo, NodeHeartbeat, CortexInfo,
+    Task as PydanticTask, TaskResult,
+    EventMessage, Insight as PydanticInsight,
+    Knowledge, Memory,
+    Plugin, PluginRegistry,
+    HealthReport, RepairAction,
+    SystemPerception, NetworkPerception, PerceptionResult,
+    SwarmNode,
+    CortexConfig, GanglionConfig,
+    Strategy, HealthStatus, TrustLevel, RepairLayer,
+    CapabilityDomain, PerceptionDimension, OpenClawVariant,
+    NodeID, TaskID, PluginID, EventID,
+)
 
 __all__ = [
     # types
