@@ -1,6 +1,6 @@
 # ClawShell 2.0 — Changelog
 
-## v1.9.1 (2026-05-12)
+## v1.8 (2026-05-12)
 
 ### 🏗️ Architecture
 - **Complete clean-room rebuild** from v1.0.0
