@@ -18,7 +18,7 @@ from urllib.request import Request, urlopen
 from urllib.error import URLError
 
 from shared.models import Plugin, PluginRegistry
-from shared.types import HealthStatus, CapabilityDomain
+from shared.models import HealthStatus, CapabilityDomain
 
 
 # ── Builtin Plugin Definitions ─────────────────────────────

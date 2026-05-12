@@ -26,7 +26,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional, Any, Callable
 
 from shared.models import Insight
-from shared.types import EventCategory, EventPriority, TaskStatus
+from shared.models import EventCategory, EventPriority, TaskStatus
 
 
 class InsightEngine:

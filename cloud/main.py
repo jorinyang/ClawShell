@@ -41,7 +41,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="ClawShell Cloud Hub",
         description="一云多端云边协同分布式神经系统 — Cloud Hub API",
-        version="1.8",
+        version="1.9",
         docs_url="/docs" if config.debug else None,
         redoc_url=None,
     )
