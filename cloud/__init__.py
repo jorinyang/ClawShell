@@ -1,6 +1,7 @@
 """Cloud Hub package.
 
 Exports all cloud engines, services, and API components.
+v1.8.1: Added Eventing infrastructure (EventStore, Tracer, DLQ, etc.)
 """
 
 from cloud.config import config
@@ -18,6 +19,19 @@ from cloud.services.vault_api import VaultAPI
 from cloud.services.oss_sync import OSSVaultSync
 from cloud.services.memos_cloud import MemOSCloudClient
 
+# v1.8.1 Eventing infrastructure
+from cloud.eventing import (
+    EventStore, Event, Topic,
+    EventTracer, EventSpan, TraceResult,
+    DeadLetterQueue, DeadLetter, DLQReason, DLQStats,
+    PriorityQueue, Priority, PQItem,
+    EventAggregator, AggregatedEvent, AggregationRule,
+    EventMetrics, EventMetric,
+    PatternMiner, Pattern, MiningResult,
+    MLEngine, AnomalyResult, TrendResult,
+    QualityEvaluator, QualityScore, QualityLevel,
+)
+
 __all__ = [
     "config",
     "CloudEventBus",
@@ -33,4 +47,14 @@ __all__ = [
     "VaultAPI",
     "OSSVaultSync",
     "MemOSCloudClient",
+    # Eventing
+    "EventStore", "Event", "Topic",
+    "EventTracer", "EventSpan", "TraceResult",
+    "DeadLetterQueue", "DeadLetter", "DLQReason", "DLQStats",
+    "PriorityQueue", "Priority", "PQItem",
+    "EventAggregator", "AggregatedEvent", "AggregationRule",
+    "EventMetrics", "EventMetric",
+    "PatternMiner", "Pattern", "MiningResult",
+    "MLEngine", "AnomalyResult", "TrendResult",
+    "QualityEvaluator", "QualityScore", "QualityLevel",
 ]
