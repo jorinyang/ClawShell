@@ -45,6 +45,19 @@ WS_FRAME_TYPES = {
     "error": "bidirectional: protocol error",
 }
 
+# ── MCP WebSocket Frame Types (v1.8.1) ────────────────
+
+MCP_FRAME_TYPES = {
+    "auth": "edge → cloud: JWT authentication frame",
+    "auth_ok": "cloud → edge: authentication success",
+    "auth_error": "cloud → edge: authentication failure",
+    "mcp_request": "edge ↔ cloud: MCP JSON-RPC request",
+    "mcp_response": "edge ↔ cloud: MCP JSON-RPC response",
+    "mcp_notification": "cloud → edge: server-initiated notification",
+    "ping": "edge ↔ cloud: keepalive ping",
+    "pong": "edge ↔ cloud: keepalive pong",
+}
+
 
 def format_ws_frame(
     frame_type: str,

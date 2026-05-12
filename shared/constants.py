@@ -30,3 +30,18 @@ WS_EVENTS_PATH = "/ws/events"
 # ── Resource limits ──────────────────────────────────
 MAX_EVENT_PAYLOAD_BYTES = 1_048_576  # 1 MB
 MAX_TASK_PAYLOAD_BYTES = 5_242_880   # 5 MB
+
+# ── MCP Configuration (v1.8.1) ──────────────────────
+MCP_DEFAULT_PORT = 8443
+MCP_WS_PATH = "/mcp/ws"
+MCP_REST_PATH = "/mcp/rest"
+JWT_EXPIRY_SECONDS = 3600
+JWT_ALGORITHM = "HS256"
+MCP_PROTOCOL_VERSION = "2024-11-05"
+
+# ── Event Store Configuration (v1.8.1) ───────────────
+EVENT_STORE_ROOT = "data/event_store"
+EVENT_RETENTION_DAYS = 30
+EVENT_MAX_BATCH_SIZE = 100
+DLQ_MAX_SIZE = 1000
+DLQ_RETRY_DELAY = 60  # seconds before dead letter retry
