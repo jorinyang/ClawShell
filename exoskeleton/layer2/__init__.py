@@ -2,6 +2,10 @@
 
 Core: Self-Repair engine, Engineering Cybernetics feedback control loop,
 Adaptive parameter tuning, Robust controller.
+
+v1.9.0 additions:
+- FeedbackControlLoop (PID controller) — from feedback_loop.py
+- StrategySwitcher (5-strategy state machine) — from strategy.py
 """
 
 import os
@@ -9,6 +13,10 @@ import time
 import json
 import threading
 from typing import Dict, List, Optional, Callable
+
+# v1.9.0 — Import new adaptive modules
+from exoskeleton.layer2.feedback_loop import FeedbackControlLoop
+from exoskeleton.layer2.strategy import StrategySwitcher
 
 
 class SelfRepairEngine:
