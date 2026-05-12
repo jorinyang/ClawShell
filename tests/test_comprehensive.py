@@ -5,7 +5,7 @@ Target: zero failures, full coverage of all public APIs.
 """
 import sys, os, time, json, tempfile, shutil, hashlib, threading
 
-os.chdir("/tmp/clawshell2-build")
+os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, ".")
 
 PASSED = 0
