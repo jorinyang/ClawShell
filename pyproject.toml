@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "clawshell"
-version = "2.0.0-dev"
+version = "1.9.1"
 description = "ClawShell 2.0 — 一云多端云边协同分布式神经系统"
 readme = "README.md"
 license = {text = "MIT"}

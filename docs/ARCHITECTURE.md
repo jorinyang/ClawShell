@@ -1,6 +1,6 @@
 # ClawShell 2.0 — 一云多端云边协同分布式神经系统
 
-> **Architecture Document** | Version 2.0.0-dev | 2026-05-12
+> **Architecture Document** | Version 1.9.1 | 2026-05-12
 
 ---
 

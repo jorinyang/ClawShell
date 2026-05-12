@@ -40,7 +40,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="ClawShell Cloud Hub",
         description="一云多端云边协同分布式神经系统 — Cloud Hub API",
-        version="2.0.0-dev",
+        version="1.9.1",
         docs_url="/docs" if config.debug else None,
         redoc_url=None,
     )
@@ -59,7 +59,7 @@ def create_app() -> FastAPI:
     async def health_check():
         return {
             "status": "healthy",
-            "version": "2.0.0-dev",
+            "version": "1.9.1",
             "timestamp": time.time(),
             "engines": {
                 "eventbus": "active" if _eventbus else "inactive",

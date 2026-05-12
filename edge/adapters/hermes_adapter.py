@@ -122,7 +122,7 @@ class HermesAdapter(BaseAdapter):
 _CLAWSHELL_SKILL_CONTENT = """---
 name: clawshell-edge
 description: ClawShell 2.0 Edge Brain — cloud-edge sync, multi-agent orchestration
-version: 2.0.0
+version: 1.9.1
 ---
 
 # ClawShell Edge Brain

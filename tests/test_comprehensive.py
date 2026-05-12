@@ -1374,7 +1374,7 @@ if _fastapi_ok:
     check("API./health 200", r.status_code == 200)
     data = r.json()
     check("API./health status", data["status"] == "healthy")
-    check("API./health version", "2.0.0" in data["version"])
+    check("API./health version", "1.9.1" in data["version"])
     check("API./health engines", len(data["engines"]) >= 8)
 
     r = client.get("/api/v1/events/?limit=5")
