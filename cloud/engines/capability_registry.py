@@ -62,6 +62,8 @@ class CapabilityRegistry:
             existing.setdefault("frameworks", [])
             existing.setdefault("ide_tools", [])
             existing.setdefault("load_score", 0)
+            existing.setdefault("cpu_count", node_info.get("cpu_count", 0))
+            existing.setdefault("memory_total_mb", node_info.get("memory_total_mb", 0.0))
 
             self._nodes[node_id] = existing
             self._save()

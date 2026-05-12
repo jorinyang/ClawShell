@@ -171,7 +171,11 @@ class EcologicalNicheMatcher:
             for agent_id, caps in self._agent_capabilities.items():
                 agent_caps = set(caps)
                 # Capability match
-                cap_score = len(required & agent_caps) / len(required) if required else 0
+                intersection = required & agent_caps
+                cap_score = len(intersection) / len(required) if required else 0
+                # Require at least partial capability match
+                if cap_score == 0:
+                    continue
                 # Demand match: prefer agents with closest capability set size
                 demand_score = 1.0 / (1 + abs(len(caps) - len(required)))
 

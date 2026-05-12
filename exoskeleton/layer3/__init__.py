@@ -106,8 +106,14 @@ class TaskOrganizer:
             self._tasks[task_id] = task
             if depends_on:
                 self._dependencies[task_id] = list(depends_on)
+                # Auto-populate dependents
+                for dep_id in depends_on:
+                    if task_id not in self._dependents.get(dep_id, []):
+                        self._dependents[dep_id].append(task_id)
             if required_by:
-                self._dependents[task_id] = list(required_by)
+                for req_id in required_by:
+                    if req_id not in self._dependents.get(task_id, []):
+                        self._dependents[task_id].append(req_id)
 
     def can_execute(self, task_id: str) -> bool:
         """Check if all dependencies are satisfied."""

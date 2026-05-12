@@ -105,6 +105,9 @@ class FeedbackControlLoop:
     def set_goal(self, goal: float):
         with self._lock:
             self.goal = goal
+            # Recompute deviation after goal change
+            if self._history:
+                self._deviation = self.goal - self._actual
 
     def feed_sensor(self, actual: float) -> float:
         """Feed sensor reading, return control signal."""
@@ -125,6 +128,8 @@ class FeedbackControlLoop:
 
     def is_converged(self) -> bool:
         with self._lock:
+            if not self._history:
+                return False  # No data means not converged
             return abs(self._deviation) <= self.tolerance
 
     def get_history(self) -> List[dict]:
