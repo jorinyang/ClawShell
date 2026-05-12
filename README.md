@@ -6,6 +6,40 @@
 
 ---
 
+## 架构全景图
+
+👉 **[查看完整交互式架构图](docs/architecture-diagram.html)** — 在浏览器中打开查看 SVG 全景架构
+
+![ClawShell 2.0 Architecture](docs/architecture-diagram.html)
+
+```
+☁️ CLOUD HUB (云枢) — 阿里云 ECS              🖥️ EDGE BRAIN (端脑) — 用户终端
+┌────────────────────────────────┐    ┌─────────────────────────────────┐
+│ FastAPI :8000 + MCP WSS :8443  │    │ L4 多Agent集群                    │
+│ ├ 12 Cloud Engines              │    │ ├ SwarmDiscovery + Trust 🆕       │
+│ ├ CloudEventBus / TaskBoard     │    │ ├ EcologyMatcher + Protocol       │
+│ ├ SkillMarket / CapRegistry     │◄──►│ L3 自组织                         │
+│ ├ SwarmCoordinator / Scheduler  │WSS │ ├ EventBus(Condition+DLQ+Tracer)🆕│
+│ ├ EvolutionEngine / Review      │MCP │ ├ TaskOrganizer + ContextManager  │
+│ ├ BroadcastEngine / N8NBridge   │    │ L2 自适应                         │
+│ ├ WorkflowEngine(Saga) 🆕        │    │ ├ SelfRepair(Backup+Checkpoint)🆕 │
+│ ├ GlobalOptimizer 🆕             │    │ ├ FeedbackControlLoop + Tuner     │
+│ ├ DeepThinkEngine 🆕             │    │ L1 自感知 (7 Monitors)            │
+│ ├ EventStore/Tracer/DLQ/ML 🆕    │    │ Gateway 🆕                        │
+│ ├ KnowledgeGraph 🆕              │    │ ├ NetworkDiscovery / DeviceMon    │
+│ ├ MCP Hub + JWT Auth 🆕          │    │ ├ KnowledgePuller / SelfHealing   │
+│ └ VaultAPI / OSS Sync / MemOS   │    │ IDEBridge (6 CLI agents)          │
+└────────────────────────────────┘    │ Ecosystem Installer (10 components)│
+                                       │ SyncDaemon (5s loop)               │
+         🧬 Persistence                 │ AdapterManager 🆕                  │
+    Genome · MemOS · MemPalace         └─────────────────────────────────┘
+    Obsidian Vault · KnowledgeGraph 🆕
+    
+    ☁️ 阿里云 ECS/OSS · GitHub · N8N · Docker
+```
+
+---
+
 ## 概述
 
 ClawShell 是一个适用于类 OpenClaw 架构的增强型外骨骼功能插件，以工程控制论为指导思想，
@@ -19,23 +53,18 @@ ClawShell 是一个适用于类 OpenClaw 架构的增强型外骨骼功能插件
   负责环境检测、插件管理、IDE 桥接、任务执行和离线自治。
   端脑可独立运行，链接云枢后实现信息同步及进化增强。
 
-## 架构全景
+### v1.8.1 跨仓库融合新增 (from ClawShell-MacOS)
 
-```
-☁️ CLOUD HUB (云枢)                     🖥️ EDGE BRAIN (端脑)
-┌──────────────────────┐         ┌──────────────────────┐
-│ FastAPI Server       │  HTTPS  │ EnvDetector          │
-│ ├ CloudEventBus      │◄───────►│ ├ Wukong/Hermes/...  │
-│ ├ GlobalTaskBoard    │   WSS   │ IDEBridge            │
-│ ├ SkillMarket        │         │ ├ Codex/Claude Code  │
-│ ├ CapabilityRegistry │         │ ├ Kimi/DeepSeek      │
-│ ├ SwarmCoordinator   │         │ ├ Copilot            │
-│ ├ EvolutionEngine    │         │ Ecosystem            │
-│ ├ ReviewEngine       │         │ ├ MemPalace/N8N/...  │
-│ └ BroadcastEngine    │         │ SyncDaemon (5s)      │
-└──────────────────────┘         │ Exoskeleton L1-L4    │
-                                 └──────────────────────┘
-```
+| 模块 | 来源 | 说明 |
+|------|------|------|
+| Event Sourcing (8 modules) | MacOS EventStore | EventStore/Tracer/DeadLetter/Priority/Aggregator/Metrics/Pattern/ML/Quality |
+| WorkflowEngine | MacOS WorkflowDomain | Saga补偿 + StepType + 内置工作流 |
+| GlobalOptimizer | MacOS GlobalOptimizer | 跨端资源优化 (COST/LATENCY/THROUGHPUT/BALANCED) |
+| DeepThinkEngine | MacOS DeepThink | Decompose→Analyze→Synthesize→Recommend |
+| KnowledgeGraph | MacOS KnowledgeGraph | 知识图谱 + 语义搜索 + 关系引擎 |
+| MCP Protocol | MacOS Cloud Hub | WebSocket Hub + JWT HS256 + 7-Domain Router |
+| Edge Gateway | MacOS Edge Gateway | NetworkDiscovery/DeviceMonitor/KnowledgePuller/SelfHealing |
+| ConditionEngine | MacOS EventBus | 条件评估 + 死信队列 + 事件追踪 |
 
 ## 核心原则
 
@@ -71,21 +100,33 @@ pip install -e ".[cloud,edge]"
 
 ```
 ClawShell/
-├── cloud/              # ☁️ Cloud Hub
+├── cloud/              # ☁️ Cloud Hub (12 engines + 3 services + Eventing + MCP)
+│   ├── engines/        #   CloudEventBus, TaskBoard, SkillMarket, Workflow🆕, etc.
+│   ├── eventing/       #   EventStore, Tracer, DLQ, ML, Quality🆕 (8 modules)
+│   ├── mcp/            #   MCPHub, JWT Auth, Domain Router🆕 (3 modules)
+│   └── services/       #   VaultAPI, OSSSync, MemOSCloud, KnowledgeGraph🆕
 ├── edge/               # 🖥️ Edge Brain
+│   ├── eventbus/       #   ConditionEngine + DLQ + Tracer🆕
+│   ├── gateway/        #   NetworkDiscovery, DeviceMonitor, KnowledgePuller🆕
+│   ├── adapters/       #   Hermes/Wukong/OpenClaw + AdapterManager🆕
+│   ├── detector/       #   8 framework detectors
+│   ├── ide_bridge/     #   6 IDE CLI bridges
+│   ├── ecosystem/      #   10 component installer
+│   └── sync/           #   SyncDaemon (5s loop)
 ├── exoskeleton/        # 🦴 四层外骨骼 (L1-L4)
-├── shared/             # 🔄 共享类型与协议
-├── deploy/             # 🚀 部署配置
-├── tests/              # 🧪 测试
-└── docs/               # 📚 文档
+├── shared/             # 🔄 共享类型与协议 (MCP Types🆕)
+├── deploy/             # 🚀 部署配置 (Terraform + Docker)
+├── tests/              # 🧪 测试 (412 comprehensive, 0 failures)
+└── docs/               # 📚 文档 + 架构图
 ```
 
 ## 文档
 
-- [架构全景](docs/ARCHITECTURE.md) — 一云多端完整架构
+- [架构全景图](docs/architecture-diagram.html) — 交互式 SVG 完整架构图
+- [架构文档](docs/ARCHITECTURE.md) — 一云多端完整架构
 - [核心定义](docs/CORE_DEFINITION.md) — 设计哲学与工程控制论
+- [更新日志](docs/CHANGELOG.md)
 - [安装指南](docs/INSTALL.md)
-- [API 参考](docs/API_REFERENCE.md)
 
 ## 许可证
 
