@@ -73,6 +73,26 @@ class SelfRepairEngine:
     def get_repair_log(self, limit: int = 50) -> List[dict]:
         return self._repair_log[-limit:]
 
+    # v1.8.1: Backup & Checkpoint enhancements (from MacOS SelfHealing)
+    def create_backup(self, name: str, content: str) -> str:
+        """Create a named backup before critical repairs."""
+        import time
+        path = os.path.join(self._data_dir, f"backup_{name}_{int(time.time())}")
+        os.makedirs(os.path.dirname(path) or self._data_dir, exist_ok=True)
+        with open(path, "w") as f:
+            f.write(content)
+        return path
+
+    def create_checkpoint(self, name: str) -> float:
+        """Create a named system checkpoint for rollback."""
+        import time, json
+        ts = time.time()
+        cp = {"name": name, "timestamp": ts, "repair_count": len(self._repair_log)}
+        path = os.path.join(self._data_dir, f"checkpoint_{name}.json")
+        with open(path, "w") as f:
+            json.dump(cp, f)
+        return ts
+
     @staticmethod
     def _map_action(issue_type: str) -> str:
         mapping = {
