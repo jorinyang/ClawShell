@@ -131,6 +131,24 @@ class SkillMarket:
 
     # ── Interactions ──────────────────────────────
 
+    def get_version_history(self, skill_name: str) -> List[dict]:
+        """Get version history for a skill (v1.8.1: from MacOS SkillDomain).
+
+        Returns list of {version, published_at, skill_id, download_count} dicts
+        sorted by version publish time.
+        """
+        with self._lock:
+            versions = []
+            for sid, skill in self._skills.items():
+                if skill.get("name") == skill_name:
+                    versions.append({
+                        "version": skill.get("version", "1.0.0"),
+                        "published_at": skill.get("published_at", 0),
+                        "skill_id": sid,
+                        "download_count": skill.get("download_count", 0),
+                    })
+            return sorted(versions, key=lambda v: v["published_at"])
+
     def download(self, skill_id: str) -> Optional[dict]:
         """Record a download and return skill content."""
         with self._lock:

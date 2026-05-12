@@ -25,6 +25,7 @@ class TaskStatus(str, Enum):
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"
+    COMPENSATING = "compensating"  # v1.8.1: Saga compensation in progress
 
 
 class TaskPriority(str, Enum):
@@ -37,10 +38,11 @@ class TaskPriority(str, Enum):
 # State transition map
 VALID_TRANSITIONS = {
     TaskStatus.PENDING: [TaskStatus.IN_PROGRESS, TaskStatus.CANCELLED],
-    TaskStatus.IN_PROGRESS: [TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED],
+    TaskStatus.IN_PROGRESS: [TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED, TaskStatus.COMPENSATING],
     TaskStatus.COMPLETED: [],  # Terminal
     TaskStatus.FAILED: [TaskStatus.PENDING],  # Can retry
     TaskStatus.CANCELLED: [],  # Terminal
+    TaskStatus.COMPENSATING: [TaskStatus.COMPLETED, TaskStatus.FAILED],  # v1.8.1
 }
 
 PRIORITY_ORDER = {

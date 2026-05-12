@@ -28,8 +28,17 @@ class CloudEventBus:
     CLEANUP_INTERVAL = 3600  # 1 hour between cleanup runs
     EXPIRY_DAYS = 30
 
-    def __init__(self, data_dir: str = "data"):
+    def __init__(self, data_dir: str = "data",
+                 event_store=None):
+        """Initialize CloudEventBus.
+
+        Args:
+            data_dir: Directory for persistent storage
+            event_store: Optional cloud.eventing.EventStore for enhanced
+                         Event Sourcing backend (v1.8.1)
+        """
         self._data_dir = data_dir
+        self._event_store = event_store  # v1.8.1 EventStore integration
         self._event_dir = os.path.join(data_dir, "eventbus")
         os.makedirs(self._event_dir, exist_ok=True)
 

@@ -79,6 +79,13 @@ class UnifiedReviewEngine:
             "edges_active": 0,
             "insights": [],
             "action_items": [],
+            # v1.8.1: Enhanced metrics (from MacOS ReviewDomain)
+            "metrics": {
+                "quality_score": None,
+                "top_events": [],
+                "anomaly_count": 0,
+            },
+            "trends": {},  # v1.8.1: Trend analysis placeholder
         }
 
         with self._lock:
