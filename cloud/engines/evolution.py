@@ -176,8 +176,8 @@ class EvolutionEngine:
         self._tracker.record("insight_added", {"insight_id": iid, "title": title})
         return iid
 
-    def get_insights(self, limit: int = 50) -> List[dict]:
-        return self._aggregator.get_insights(limit=limit)
+    def get_insights(self, limit: int = 50, min_confidence: float = 0.0) -> List[dict]:
+        return self._aggregator.get_insights(limit=limit, min_confidence=min_confidence)
 
     def get_patterns(self, limit: int = 50) -> List[dict]:
         return self._miner.get_patterns(limit=limit)
