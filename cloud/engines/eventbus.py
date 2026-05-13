@@ -95,6 +95,17 @@ class CloudEventBus:
                 # Store
                 event["_hash"] = ch
                 event["_stored_at"] = time.time()
+                # 时间戳规范化：ISO字符串转float
+                ts_raw = event.get("timestamp")
+                if isinstance(ts_raw, str):
+                    try:
+                        event["timestamp"] = datetime.fromisoformat(
+                            ts_raw.replace("Z", "+00:00")
+                        ).timestamp()
+                    except (ValueError, TypeError):
+                        event["timestamp"] = time.time()
+                elif not isinstance(ts_raw, (int, float)):
+                    event["timestamp"] = time.time()
                 self._events[event_id] = event
                 self._hashes.add(ch)
 
@@ -151,8 +162,13 @@ class CloudEventBus:
                     if not fnmatch.fnmatch(event.get("source", ""), source):
                         continue
 
-                # Time filters
+                # Time filters — normalize timestamps for comparison
                 ts = event.get("timestamp", 0)
+                if isinstance(ts, str):
+                    try:
+                        ts = datetime.fromisoformat(ts.replace("Z", "+00:00")).timestamp()
+                    except (ValueError, TypeError):
+                        ts = 0
                 if since is not None and ts < since:
                     continue
                 if until is not None and ts > until:
@@ -161,7 +177,15 @@ class CloudEventBus:
                 results.append(self._clean_event(event))
 
             # Sort by timestamp desc, paginate
-            results.sort(key=lambda e: e.get("timestamp", 0), reverse=True)
+            def _ts_key(e: dict) -> float:
+                t = e.get("timestamp", 0)
+                if isinstance(t, str):
+                    try:
+                        return datetime.fromisoformat(t.replace("Z", "+00:00")).timestamp()
+                    except (ValueError, TypeError):
+                        return 0
+                return float(t) if t else 0
+            results.sort(key=_ts_key, reverse=True)
             return results[offset:offset + limit]
 
     def query_by_type(self, event_type: str, limit: int = 100) -> List[dict]:
@@ -368,6 +392,12 @@ class CloudEventBus:
     def _save_event_file(self, event: dict):
         """Save a single event to its date-based JSON file."""
         ts = event.get("timestamp", time.time())
+        # 兼容 ISO 字符串时间戳
+        if isinstance(ts, str):
+            try:
+                ts = datetime.fromisoformat(ts.replace("Z", "+00:00")).timestamp()
+            except (ValueError, TypeError):
+                ts = time.time()
         date_str = datetime.fromtimestamp(ts).strftime("%Y-%m-%d")
         date_dir = os.path.join(self._event_dir, date_str)
         os.makedirs(date_dir, exist_ok=True)
