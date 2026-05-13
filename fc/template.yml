@@ -1,0 +1,74 @@
+ROSTemplateFormatVersion: '2015-09-01'
+Transform: 'Aliyun::Serverless-2018-04-03'
+Resources:
+  # ── FC Service ──────────────────────────────────────────────
+  clawshell-fc:
+    Type: 'Aliyun::Serverless::Service'
+    Properties:
+      Description: 'ClawShell 2.0 Serverless Functions — Hong Kong'
+      Role: 'acs:ram::{account-id}:role/fc-clawshell-role'
+      LogConfig:
+        Project: clawshell-logs
+        Logstore: fc-logs
+      InternetAccess: true
+      VpcConfig:
+        VpcId: ''
+        VSwitchIds: ['']
+
+    # ── Event Processor ───────────────────────────────────────
+    event-processor:
+      Type: 'Aliyun::Serverless::Function'
+      Properties:
+        Handler: fc_handler.event_processor_handler
+        Runtime: python3.11
+        CodeUri: ./
+        Timeout: 120
+        MemorySize: 512
+        EnvironmentVariables:
+          CLOUDHUB_URL: http://47.239.71.174
+          FC_FUNCTION_TYPE: event_processor
+      Events:
+        http-trigger:
+          Type: HTTP
+          Properties:
+            AuthType: ANONYMOUS
+            Methods: [POST]
+
+    # ── Insight Generator ─────────────────────────────────────
+    insight-generator:
+      Type: 'Aliyun::Serverless::Function'
+      Properties:
+        Handler: fc_handler.insight_generator_handler
+        Runtime: python3.11
+        CodeUri: ./
+        Timeout: 120
+        MemorySize: 512
+        EnvironmentVariables:
+          CLOUDHUB_URL: http://47.239.71.174
+          FC_FUNCTION_TYPE: insight_generator
+      Events:
+        timer-trigger:
+          Type: Timer
+          Properties:
+            CronExpression: '0 */5 * * * *'
+            Enable: true
+
+    # ── Health Monitor ────────────────────────────────────────
+    health-monitor:
+      Type: 'Aliyun::Serverless::Function'
+      Properties:
+        Handler: fc_handler.health_monitor_handler
+        Runtime: python3.11
+        CodeUri: ./
+        Timeout: 30
+        MemorySize: 256
+        EnvironmentVariables:
+          CLOUDHUB_URL: http://47.239.71.174
+          FC_FUNCTION_TYPE: health_monitor
+          DINGTALK_WEBHOOK: ''
+      Events:
+        timer-trigger:
+          Type: Timer
+          Properties:
+            CronExpression: '0 */1 * * * *'
+            Enable: true
