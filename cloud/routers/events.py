@@ -36,7 +36,7 @@ async def ingest_events(request: Request):
     if not isinstance(events, list):
         return format_api_response(False, error="'events' must be a list")
 
-    eb = _get_eventbus()
+    eb = _get_eventbus(request)
     accepted = eb.ingest(events)
     return format_api_response(True, data={"accepted": accepted, "total": len(events)})
 
@@ -49,9 +49,9 @@ async def query_events(
     until: Optional[float] = Query(None),
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
-):
+, request: Request):
     """Query events with optional filters."""
-    eb = _get_eventbus()
+    eb = _get_eventbus(request)
     results = eb.query(
         event_type=event_type,
         source=source,
@@ -64,16 +64,16 @@ async def query_events(
 
 
 @router.get("/stats")
-async def event_stats():
+async def event_stats(request: Request):
     """Get EventBus statistics."""
-    eb = _get_eventbus()
+    eb = _get_eventbus(request)
     return format_api_response(True, data=eb.get_stats())
 
 
 @router.get("/{event_id}")
-async def get_event(event_id: str):
+async def get_event(event_id: str, request: Request):
     """Get a single event by ID."""
-    eb = _get_eventbus()
+    eb = _get_eventbus(request)
     event = eb.get_event(event_id)
     if not event:
         return format_api_response(False, error=f"Event '{event_id}' not found")
@@ -92,6 +92,6 @@ async def broadcast_events(request: Request):
     if not isinstance(events, list):
         return format_api_response(False, error="'events' must be a list")
 
-    eb = _get_eventbus()
+    eb = _get_eventbus(request)
     accepted_ids = eb.broadcast(events)
     return format_api_response(True, data={"broadcast_ids": accepted_ids})

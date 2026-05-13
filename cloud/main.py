@@ -50,6 +50,20 @@ def create_app() -> FastAPI:
     app.add_middleware(AuthMiddleware)
     app.add_middleware(RateLimitMiddleware)
 
+    # v1.12.0: Expose engines via app.state for router access
+    app.state.eventbus = _eventbus
+    app.state.scheduler = _scheduler
+    app.state.capability_registry = _capability_registry
+    app.state.task_board = _task_board
+    app.state.skill_market = _skill_market
+    app.state.swarm = _swarm
+    app.state.evolution = _evolution
+    app.state.review = _review
+    app.state.broadcast = _broadcast
+    app.state.n8n_bridge = _n8n_bridge
+    app.state.insight = _insight
+    app.state.brain = _brain
+
     @app.middleware("http")
     async def cors_middleware(request, call_next):
         if request.method == "OPTIONS":
