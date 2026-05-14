@@ -35,6 +35,17 @@ class TaskPriority(str, Enum):
     LOW = "low"
 
 
+def _normalize_priority(p):
+    """Normalize priority value — handles legacy int values."""
+    if isinstance(p, (int, float)):
+        return "critical" if p >= 90 else "high" if p >= 70 else "medium" if p >= 40 else "low"
+    try:
+        TaskPriority(p)
+        return p
+    except ValueError:
+        return "low"
+
+
 # State transition map
 VALID_TRANSITIONS = {
     TaskStatus.PENDING: [TaskStatus.IN_PROGRESS, TaskStatus.CANCELLED],
@@ -112,7 +123,7 @@ class GlobalTaskBoard:
 
             # Sort by priority DESC
             tasks.sort(key=lambda t: PRIORITY_ORDER.get(
-                TaskPriority(t.get("priority", "low")), 99
+                TaskPriority(_normalize_priority(t.get("priority", "low"))), 99
             ))
             return [dict(t) for t in tasks[offset:offset + limit]]
 
