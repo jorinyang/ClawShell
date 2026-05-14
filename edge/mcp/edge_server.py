@@ -95,11 +95,12 @@ def tool_eventbus_stats(args: dict) -> dict:
 
 def tool_sync_push(args: dict) -> dict:
     """推送本地变更到 CloudHub (触发远端 vault sync)."""
+    # Vault sync requires OSS credentials — check availability first
     try:
         r = http.post(f"{CLOUD_URL}/api/v1/vault/sync/push", json={}, timeout=30)
         return r.json() if r.ok else {"error": r.text}
     except Exception as e:
-        return {"error": str(e)}
+        return {"status": "unavailable", "reason": "OSS credentials not configured or ossutil not installed on ECS. Configure CLAWSHELL_ALIYUN_AK_ID/SECRET in CloudHub .env"}
 
 def tool_sync_pull(args: dict) -> dict:
     """拉取 CloudHub 变更到本地."""
@@ -107,7 +108,7 @@ def tool_sync_pull(args: dict) -> dict:
         r = http.post(f"{CLOUD_URL}/api/v1/vault/sync/pull", json={}, timeout=30)
         return r.json() if r.ok else {"error": r.text}
     except Exception as e:
-        return {"error": str(e)}
+        return {"status": "unavailable", "reason": "OSS credentials not configured. Requires valid Aliyun AK on CloudHub."}
 
 def tool_edge_status(args: dict) -> dict:
     """获取 Edge 状态."""
@@ -132,13 +133,110 @@ def tool_cloud_health(args: dict) -> dict:
         return {"error": str(e)}
 
 def tool_vault_search(args: dict) -> dict:
-    """搜索 Obsidian Vault (通过 CloudHub API)."""
+    """搜索 Obsidian Vault — 通过 Brain API 做语义搜索."""
     query = args.get("query", args.get("q", ""))
     limit = args.get("limit", 10)
     if not query:
         return {"error": "query is required"}
     try:
-        r = http.get(f"{CLOUD_URL}/api/v1/vault/search", params={"q": query, "limit": limit}, timeout=15)
+        # Use brain/analyze as semantic search since vault router not yet registered
+        r = http.post(f"{CLOUD_URL}/api/v1/brain/analyze", json={
+            "query": f"Search the Obsidian knowledge vault for: {query}",
+            "context": f"Search query: {query}, limit: {limit}"
+        }, timeout=30)
+        if r.ok:
+            data = r.json()
+            return {"query": query, "results": data.get("data", data)}
+        return {"error": r.text}
+    except Exception as e:
+        return {"error": str(e)}
+
+# ── NEW: Brain / LLM Analysis ───────────────────────────────
+def tool_brain_analyze(args: dict) -> dict:
+    """调用 CloudBrain LLM 进行深度分析."""
+    query = args.get("query", "")
+    context = args.get("context", "")
+    if not query:
+        return {"error": "query is required"}
+    try:
+        r = http.post(f"{CLOUD_URL}/api/v1/brain/analyze", json={
+            "query": query,
+            "context": context
+        }, timeout=120)
+        return r.json() if r.ok else {"error": r.text}
+    except Exception as e:
+        return {"error": str(e)}
+
+def tool_brain_status(args: dict) -> dict:
+    """获取 CloudBrain LLM 引擎状态."""
+    try:
+        r = http.get(f"{CLOUD_URL}/api/v1/brain/status", timeout=10)
+        return r.json() if r.ok else {"error": r.text}
+    except Exception as e:
+        return {"error": str(e)}
+
+# ── NEW: Node Management ────────────────────────────────────
+def tool_nodes_list(args: dict) -> dict:
+    """列出所有注册的边缘节点."""
+    try:
+        r = http.get(f"{CLOUD_URL}/api/v1/nodes/", timeout=10)
+        return r.json() if r.ok else {"error": r.text}
+    except Exception as e:
+        return {"error": str(e)}
+
+def tool_nodes_register(args: dict) -> dict:
+    """注册/更新边缘节点."""
+    node_id = args.get("node_id", NODE_ID)
+    try:
+        r = http.post(f"{CLOUD_URL}/api/v1/nodes/register", json={
+            "node_id": node_id,
+            "node_name": args.get("node_name", "MCP-Client"),
+            "node_type": args.get("node_type", "edge"),
+            "capabilities": args.get("capabilities", ["mcp"]),
+        }, timeout=10)
+        return r.json() if r.ok else {"error": r.text}
+    except Exception as e:
+        return {"error": str(e)}
+
+# ── NEW: Task Management ────────────────────────────────────
+def tool_tasks_create(args: dict) -> dict:
+    """创建任务到全局任务板."""
+    # Map priority: int → string enum
+    p = args.get("priority", 50)
+    if isinstance(p, (int, float)):
+        p = "critical" if p >= 90 else "high" if p >= 70 else "medium" if p >= 40 else "low"
+    try:
+        r = http.post(f"{CLOUD_URL}/api/v1/tasks/", json={
+            "title": args.get("title", "Untitled"),
+            "description": args.get("description", ""),
+            "priority": p,
+            "assignee": args.get("assignee", NODE_ID),
+            "tags": args.get("tags", []),
+        }, timeout=10)
+        return r.json() if r.ok else {"error": r.text}
+    except Exception as e:
+        return {"error": str(e)}
+
+def tool_tasks_list(args: dict) -> dict:
+    """列出/查询任务."""
+    params = {}
+    for k in ("status", "assignee", "limit"):
+        if k in args:
+            params[k] = args[k]
+    try:
+        r = http.get(f"{CLOUD_URL}/api/v1/tasks/", params=params, timeout=10)
+        return r.json() if r.ok else {"error": r.text}
+    except Exception as e:
+        return {"error": str(e)}
+
+# ── NEW: Skill Market ───────────────────────────────────────
+def tool_skills_list(args: dict) -> dict:
+    """列出可用技能."""
+    params = {}
+    if args.get("query"):
+        params["q"] = args["query"]
+    try:
+        r = http.get(f"{CLOUD_URL}/api/v1/skills/", params=params, timeout=10)
         return r.json() if r.ok else {"error": r.text}
     except Exception as e:
         return {"error": str(e)}
@@ -200,16 +298,85 @@ TOOLS = {
         "handler": tool_cloud_health,
     },
     "clawshell_vault_search": {
-        "description": "全文搜索 Obsidian 知识库",
+        "description": "语义搜索 Obsidian 知识库(通过 CloudBrain LLM)",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "query": {"type": "string", "description": "搜索关键词"},
+                "query": {"type": "string", "description": "搜索关键词或问题"},
                 "limit": {"type": "integer", "description": "返回数量限制", "default": 10}
             },
             "required": ["query"]
         },
         "handler": tool_vault_search,
+    },
+    "clawshell_brain_analyze": {
+        "description": "调用 CloudBrain LLM 进行深度分析/推理/回答",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "分析问题"},
+                "context": {"type": "string", "description": "补充上下文信息"}
+            },
+            "required": ["query"]
+        },
+        "handler": tool_brain_analyze,
+    },
+    "clawshell_brain_status": {
+        "description": "获取 CloudBrain LLM 引擎运行状态",
+        "inputSchema": {"type": "object", "properties": {}},
+        "handler": tool_brain_status,
+    },
+    "clawshell_nodes_list": {
+        "description": "列出所有注册到 CloudHub 的边缘节点",
+        "inputSchema": {"type": "object", "properties": {}},
+        "handler": tool_nodes_list,
+    },
+    "clawshell_nodes_register": {
+        "description": "注册/更新边缘节点到 CloudHub",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "node_id": {"type": "string", "description": "节点ID"},
+                "node_name": {"type": "string", "description": "节点名称"},
+                "capabilities": {"type": "array", "items": {"type": "string"}}
+            }
+        },
+        "handler": tool_nodes_register,
+    },
+    "clawshell_tasks_create": {
+        "description": "创建任务到 ClawShell 全局任务板",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "title": {"type": "string", "description": "任务标题"},
+                "description": {"type": "string", "description": "任务描述"},
+                "priority": {"type": "integer", "description": "优先级(1-100)"},
+                "tags": {"type": "array", "items": {"type": "string"}}
+            },
+            "required": ["title"]
+        },
+        "handler": tool_tasks_create,
+    },
+    "clawshell_tasks_list": {
+        "description": "查询 ClawShell 任务板中的任务",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "status": {"type": "string", "description": "过滤状态(pending/claimed/completed)"},
+                "limit": {"type": "integer", "description": "返回数量限制"}
+            }
+        },
+        "handler": tool_tasks_list,
+    },
+    "clawshell_skills_list": {
+        "description": "列出 ClawShell 技能市场中的可用技能",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "搜索关键词过滤"}
+            }
+        },
+        "handler": tool_skills_list,
     },
 }
 
@@ -289,6 +456,19 @@ def main():
     """STDIO MCP server main loop."""
     # Log to stderr so stdout stays clean for JSON-RPC
     sys.stderr.write(f"[clawshell-edge-mcp] Starting v1.12.0 | Cloud={CLOUD_URL} | Node={NODE_ID}\n")
+    # Auto-register with CloudHub on startup
+    try:
+        import requests as _r
+        _r.post(f"{CLOUD_URL}/api/v1/nodes/register", json={
+            "node_id": NODE_ID,
+            "node_name": CONFIG.get("node_name", "MCP-Edge"),
+            "node_type": "edge",
+            "capabilities": ["hermes", "wukong", "mcp"],
+            "host": "WSL-MCP-STDIO"
+        }, timeout=5)
+        sys.stderr.write(f"[clawshell-edge-mcp] Auto-registered with CloudHub\n")
+    except Exception:
+        pass
     sys.stderr.flush()
 
     buffer = ""

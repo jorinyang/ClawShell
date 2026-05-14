@@ -91,7 +91,10 @@ def create_app() -> FastAPI:
                 "insight": "active" if _insight else "inactive",  # v1.9.0
                 "brain": "active" if _brain else "inactive",  # v1.12.0
             },
-            "edges_online": _swarm.online_count() if _swarm else 0,
+            "edges_online": (
+                (_swarm.online_count() if _swarm else 0) +
+                (_capability_registry.online_count() if _capability_registry else 0)
+            ),
         }
 
     # Register routers
