@@ -84,7 +84,7 @@ def search_memos_cloud(query: str, limit: int = 10) -> List[dict]:
 
 
 def search_memos_local(query: str, limit: int = 10) -> List[dict]:
-    """Search MemOS Local API."""
+    """Search MemOS Local Bridge API (port 18800)."""
     results = []
     try:
         r = http.get(
@@ -93,10 +93,12 @@ def search_memos_local(query: str, limit: int = 10) -> List[dict]:
             timeout=5,
         )
         if r.ok:
-            for item in r.json():
+            data = r.json()
+            for item in data.get("results", []):
                 results.append({
                     "source": "memos_local",
-                    "content": str(item)[:300],
+                    "content": str(item.get("content", ""))[:300],
+                    "key": item.get("key", ""),
                 })
     except Exception:
         pass
@@ -181,15 +183,26 @@ def tool_memory_stats(args: dict) -> dict:
         except Exception:
             stats["mempalace"] = {"error": "read failed"}
 
+    try:
+        r = http.get(f"{MEMOS_LOCAL_URL}/health", timeout=5)
+        stats["memos_local"] = r.json() if r.ok else "unhealthy"
+    except Exception:
+        stats["memos_local"] = "unreachable"
+
     if MEMOS_CLOUD_API_KEY:
         try:
             r = http.get(
-                f"{MEMOS_CLOUD_URL}/stats",
-                params={"user_id": MEMOS_CLOUD_USER_ID},
+                f"{MEMOS_CLOUD_URL}/search",
+                params={"q": "health_check", "user_id": MEMOS_CLOUD_USER_ID, "limit": 1},
                 headers={"Authorization": f"Bearer {MEMOS_CLOUD_API_KEY}"},
-                timeout=5,
+                timeout=10,
             )
-            stats["memos_cloud"] = r.json() if r.ok else "unreachable"
+            if r.ok:
+                stats["memos_cloud"] = "connected"
+            elif r.status_code == 500:
+                stats["memos_cloud"] = "degraded (server error — API key may need refresh)"
+            else:
+                stats["memos_cloud"] = f"error ({r.status_code})"
         except Exception:
             stats["memos_cloud"] = "unreachable"
 

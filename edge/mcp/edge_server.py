@@ -94,21 +94,24 @@ def tool_eventbus_stats(args: dict) -> dict:
         return {"error": str(e)}
 
 def tool_sync_push(args: dict) -> dict:
-    """推送本地变更到 CloudHub (触发远端 vault sync)."""
-    # Vault sync requires OSS credentials — check availability first
+    """推送本地变更到 CloudHub (需要OSS凭证)."""
     try:
-        r = http.post(f"{CLOUD_URL}/api/v1/vault/sync/push", json={}, timeout=30)
-        return r.json() if r.ok else {"error": r.text}
-    except Exception as e:
-        return {"status": "unavailable", "reason": "OSS credentials not configured or ossutil not installed on ECS. Configure CLAWSHELL_ALIYUN_AK_ID/SECRET in CloudHub .env"}
+        r = http.post(f"{CLOUD_URL}/api/v1/vault/sync/push", json={}, timeout=10)
+        if r.ok:
+            return r.json()
+    except Exception:
+        pass
+    return {"status": "unavailable", "reason": "OSS credentials not configured on CloudHub. Requires valid Aliyun AK (CLAWSHELL_ALIYUN_AK_ID/SECRET) and ossutil installed."}
 
 def tool_sync_pull(args: dict) -> dict:
-    """拉取 CloudHub 变更到本地."""
+    """拉取 CloudHub 变更到本地 (需要OSS凭证)."""
     try:
-        r = http.post(f"{CLOUD_URL}/api/v1/vault/sync/pull", json={}, timeout=30)
-        return r.json() if r.ok else {"error": r.text}
-    except Exception as e:
-        return {"status": "unavailable", "reason": "OSS credentials not configured. Requires valid Aliyun AK on CloudHub."}
+        r = http.post(f"{CLOUD_URL}/api/v1/vault/sync/pull", json={}, timeout=10)
+        if r.ok:
+            return r.json()
+    except Exception:
+        pass
+    return {"status": "unavailable", "reason": "OSS credentials not configured on CloudHub. Requires valid Aliyun AK and ossutil installed."}
 
 def tool_edge_status(args: dict) -> dict:
     """获取 Edge 状态."""
