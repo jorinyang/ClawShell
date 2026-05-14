@@ -18,8 +18,12 @@ from shared.protocol import format_api_response
 router = APIRouter(tags=["nodes"])
 
 
-def _get_registry():
-    """Get CapabilityRegistry from app state."""
+def _get_registry(request: Request = None):
+    """Get CapabilityRegistry from app state (with fallback)."""
+    if request and hasattr(request.app.state, "capability_registry"):
+        reg = request.app.state.capability_registry
+        if reg:
+            return reg
     from cloud.main import _capability_registry
     if not _capability_registry:
         raise HTTPException(status_code=503, detail="CapabilityRegistry not initialized")
@@ -40,7 +44,7 @@ async def register_node(request: Request):
     if not node_id:
         return format_api_response(False, error="node_id is required")
 
-    registry = _get_registry()
+    registry = _get_registry(request)
     try:
         nid = registry.register(body)
         return format_api_response(True, data={"node_id": nid, "status": "registered"})
@@ -56,7 +60,7 @@ async def node_heartbeat(node_id: str, request: Request):
     except Exception:
         body = {}
 
-    registry = _get_registry()
+    registry = _get_registry(request)
     metrics = body.get("metrics") if body else None
     ok = registry.heartbeat(node_id, metrics)
     if not ok:
@@ -66,25 +70,26 @@ async def node_heartbeat(node_id: str, request: Request):
 
 @router.get("/nodes/")
 async def list_nodes(
+    request: Request,
     status: Optional[str] = Query(None),
 ):
     """List registered nodes."""
-    registry = _get_registry()
+    registry = _get_registry(request)
     nodes = registry.list_nodes(status=status)
     return format_api_response(True, data={"nodes": nodes, "count": len(nodes)})
 
 
 @router.get("/nodes/online")
-async def online_count():
+async def online_count(request: Request):
     """Count online nodes."""
-    registry = _get_registry()
+    registry = _get_registry(request)
     return format_api_response(True, data={"online": registry.online_count()})
 
 
 @router.get("/nodes/{node_id}")
-async def get_node(node_id: str):
+async def get_node(node_id: str, request: Request):
     """Get node details."""
-    registry = _get_registry()
+    registry = _get_registry(request)
     node = registry.get_node(node_id)
     if not node:
         return format_api_response(False, error=f"Node '{node_id}' not found")
@@ -92,9 +97,9 @@ async def get_node(node_id: str):
 
 
 @router.delete("/nodes/{node_id}")
-async def deregister_node(node_id: str):
+async def deregister_node(node_id: str, request: Request):
     """Deregister a node."""
-    registry = _get_registry()
+    registry = _get_registry(request)
     ok = registry.deregister(node_id)
     if not ok:
         return format_api_response(False, error=f"Node '{node_id}' not found")
@@ -112,7 +117,7 @@ async def health_report(request: Request):
         return format_api_response(False, error="Invalid JSON body")
 
     node_id = body.get("node_id", "")
-    registry = _get_registry()
+    registry = _get_registry(request)
 
     metrics = body.get("metrics", {})
     ok = registry.heartbeat(node_id, metrics)
