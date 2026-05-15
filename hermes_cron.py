@@ -331,6 +331,22 @@ Format as a clean markdown report."""
 
     log.info(f"Daily report saved to {daily_file}")
 
+    # v1.12.0: Vault OSS 双向同步
+    log.info("Starting OSS Vault sync...")
+    try:
+        r_push = session.post(f"{CLOUDHUB_URL}/api/v1/vault/sync/push", timeout=120)
+        push_ok = r_push.ok
+        log.info(f"Vault sync PUSH: {'OK' if push_ok else 'FAILED'} {r_push.text[:200]}")
+    except Exception as e:
+        log.warning(f"Vault sync PUSH error: {e}")
+
+    try:
+        r_pull = session.post(f"{CLOUDHUB_URL}/api/v1/vault/sync/pull", timeout=120)
+        pull_ok = r_pull.ok
+        log.info(f"Vault sync PULL: {'OK' if pull_ok else 'FAILED'} {r_pull.text[:200]}")
+    except Exception as e:
+        log.warning(f"Vault sync PULL error: {e}")
+
     # 清理旧洞察数据 (保留最近7天)
     insights_dir = DATA_DIR / "insights"
     if insights_dir.exists():

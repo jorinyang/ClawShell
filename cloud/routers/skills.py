@@ -12,6 +12,12 @@ def _get_skill_market(request: Request = None):
     if not _skill_market: raise HTTPException(503, "SkillMarket not initialized")
     return _skill_market
 
+# ⚠️ /stats must be BEFORE /{skill_id} to avoid route conflict
+@router.get("/stats")
+async def skill_stats(request: Request):
+    sm = _get_skill_market(request)
+    return format_api_response(True, data=sm.get_stats())
+
 @router.post("/")
 async def publish_skill(request: Request):
     body = await request.json()
@@ -37,7 +43,3 @@ async def download_skill(skill_id: str, request: Request):
     s = _get_skill_market(request).download(skill_id)
     if not s: return format_api_response(False, error="Not found")
     return format_api_response(True, data=s)
-
-@router.get("/stats")
-async def skill_stats(request: Request):
-    return format_api_response(True, data=_get_skill_market(request).get_stats())
