@@ -4,62 +4,57 @@
 
 ---
 
-## 安装方案
+## 5 分钟上手
 
-```
-┌─────────────────────────────────────────────────────────┐
-│  云枢 (Cloud Hub)               端脑 (Edge Brain)        │
-│  安装一次, 部署于ECS            每台机器安装一次          │
-│                                                         │
-│  clawshell-cloud install        clawshell install        │
-│  ├─ 系统检测                    ├─ 系统检测               │
-│  ├─ 克隆代码                    ├─ 框架发现(Hermes/Wukong)│
-│  ├─ LLM/OSS API Keys            ├─ 云枢URL配置            │
-│  ├─ systemd + cron              ├─ MemPalace + MemOS      │
-│  └─ 验证12引擎                   └─ MCP注入 + Adapter      │
-│                                                         │
-│  幂等: 重复运行仅更新           幂等: 重复运行不破坏配置   │
-└─────────────────────────────────────────────────────────┘
-```
+### 云枢部署 (ECS服务器)
 
-### 云枢安装 (ECS, 仅一次)
+**前置**: 阿里云账号 + DeepSeek API Key
+
+1. 购买 ECS: 香港/新加坡, 2C4G, Ubuntu 22.04 → [详细指引](docs/CLOUD_HUB_DEPLOY.md)
+2. SSH 登录后一键安装:
 
 ```bash
 git clone https://github.com/jorinyang/ClawShell.git /opt/clawshell
 python3 /opt/clawshell/bin/clawshell-cloud install
 ```
 
-需要提供: DeepSeek API Key (必填), Aliyun AK (可选,启用OSS)
+3. 根据提示输入 DeepSeek API Key，3分钟内完成
 
-### 端脑安装 (每台本地机器)
+### 端脑部署 (本地机器)
 
 ```bash
 git clone https://github.com/jorinyang/ClawShell.git ~/.clawshell
 python3 ~/.clawshell/bin/clawshell install
 ```
 
-需要提供: CloudHub URL (默认 `http://47.239.71.174`), MemOS Cloud Key (可选)
+自动发现 Hermes / Wukong，一键注入。
 
-| 信息 | 云枢 | 端脑 | 必填 |
-|------|:--:|:--:|:--:|
-| DeepSeek API Key | ✅ | — | 云枢必填 |
-| Aliyun AccessKey | ✅ | — | OSS可选 |
-| CloudHub URL | — | ✅ | 有默认值 |
-| MemOS Cloud Key | — | 可选 | 可选 |
-| 注入框架选择 | — | ✅ | 自动发现 |
+---
 
-### 命令
+## 安装信息速查
+
+| 需要的信息 | 云枢 | 端脑 | 获取方式 |
+|-----------|:--:|:--:|------|
+| DeepSeek API Key | ✅ 必填 | — | platform.deepseek.com/api_keys |
+| Aliyun AccessKey | 可选 | — | ram.console.aliyun.com |
+| CloudHub URL | — | 自动 | ECS公网IP |
+| MemOS Cloud Key | — | 可选 | memos-dashboard.openmem.net |
+| 框架选择 | — | 自动发现 | Hermes/Wukong/OpenClaw |
+
+---
+
+## 命令
 
 ```bash
-# 云枢
-clawshell-cloud install          交互式安装
-clawshell-cloud status           状态检查
-clawshell-cloud update           更新(幂等)
+# 云枢 (ECS)
+clawshell-cloud install    交互式安装
+clawshell-cloud status     健康检查
+clawshell-cloud update     升级(幂等)
 
-# 端脑
-clawshell install                交互式安装
-clawshell install --quick        静默安装
-clawshell status                 状态检查
+# 端脑 (本地)
+clawshell install          交互式安装
+clawshell install --quick  静默安装
+clawshell status           状态检查
 ```
 
 ---
@@ -67,18 +62,22 @@ clawshell status                 状态检查
 ## 架构
 
 ```
-☁️ Cloud Hub (ECS)                     🖥️ Edge Brain (WSL/macOS)
-12 Engines: EventBus TaskBoard         MCP STDIO (18 tools)
-SkillMarket BrainLLM Swarm             MemPalace · MemOS Bridge
-OSS Vault · Cron · N8N                 Adapters: Hermes/Wukong
+☁️ Cloud Hub (ECS)                  🖥️ Edge Brain (WSL/macOS)
+12 Engines active                   MCP STDIO (18 tools)
+Brain LLM · EventBus · OSS Vault    MemPalace · MemOS Bridge
+Cron (insight/review/optimize)      Adapters: Hermes/Wukong
 ```
 
 ---
 
 ## 文档
 
-- [安装最佳实践](docs/INSTALL_BEST_PRACTICES.md)
-- [Wukong MCP集成](docs/WUKONG_INTEGRATION.md)
-- [Release Notes](RELEASE_v1.12.0.md)
+| 文档 | 内容 |
+|------|------|
+| [Cloud Hub 部署指南](docs/CLOUD_HUB_DEPLOY.md) | ECS购买+安装+Nginx+FAQ |
+| [安装最佳实践](docs/INSTALL_BEST_PRACTICES.md) | 端脑安装+验证+排错 |
+| [Wukong MCP 集成](docs/WUKONG_INTEGRATION.md) | MCP配置参考 |
+| [Release v1.12.0](RELEASE_v1.12.0.md) | 完整变更记录 |
+| [仓库对比分析](docs/REPO_COMPARISON_ANALYSIS.md) | ClawShell vs ClawShell-MacOS |
 
 MIT
