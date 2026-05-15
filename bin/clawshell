@@ -1,0 +1,321 @@
+#!/usr/bin/env python3
+"""
+ClawShell CLI — unified entry point
+
+Usage:
+  clawshell install     交互式安装向导  
+  clawshell status      查看Edge状态
+  clawshell start       启动Edge守护进程
+  clawshell stop        停止Edge守护进程
+"""
+
+import sys
+import os
+import json
+import uuid
+import shutil
+import subprocess
+import platform
+from pathlib import Path
+
+# ── Constants ──────────────────────────────────────────────────
+REPO_URL = "https://github.com/jorinyang/ClawShell.git"
+DEFAULT_CLOUD_URL = "http://47.239.71.174"
+CLAWSHELL_HOME = Path(os.path.expanduser("~/.clawshell"))
+EDGE_HOME = Path(os.path.expanduser("~/.clawshell-edge"))
+VERSION = "v1.12.0"
+
+BANNER = r"""
+  ╔══════════════════════════════════════╗
+  ║     ClawShell {ver} Installer       ║
+  ║     一云多端云边协同分布式神经系统     ║
+  ╚══════════════════════════════════════╝
+""".format(ver=VERSION)
+
+
+def ask(prompt: str, default: str = "", required: bool = False) -> str:
+    if default:
+        prompt = f"{prompt} [{default}]"
+    while True:
+        try:
+            answer = input(f"  › {prompt}: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("\n  ✖ Cancelled"); sys.exit(1)
+        if not answer and default: return default
+        if not answer and required:
+            print("  ⚠ Required"); continue
+        return answer or default
+
+
+def confirm(prompt: str, default: bool = True) -> bool:
+    yn = "Y/n" if default else "y/N"
+    answer = ask(f"{prompt} ({yn})", "").lower()
+    return default if not answer else answer in ("y", "yes")
+
+
+def detect_frameworks() -> list:
+    found = []
+    hermes_home = Path(os.path.expanduser("~/.hermes"))
+    if hermes_home.exists() and (hermes_home / "config.yaml").exists():
+        found.append({"name": "hermes", "home": str(hermes_home), "type": "hermes-agent"})
+
+    for wukong_path in [
+        Path(os.path.expanduser("~/.real")),
+        Path(f"/mnt/c/Users/{os.environ.get('USER','Aorus')}/.real"),
+    ]:
+        if wukong_path.exists():
+            users = [d.name for d in wukong_path.iterdir() if d.is_dir() and not d.name.startswith(".")]
+            found.append({"name": "wukong", "home": str(wukong_path), "type": "wukong", "users": users})
+            break
+
+    openclaw_home = Path(os.path.expanduser("~/.openclaw"))
+    if openclaw_home.exists():
+        found.append({"name": "openclaw", "home": str(openclaw_home), "type": "openclaw"})
+    return found
+
+
+def detect_system() -> dict:
+    info = {"os": platform.system(), "os_version": platform.release(),
+            "machine": platform.machine(), "python": sys.version.split()[0],
+            "is_wsl": "microsoft" in platform.release().lower()}
+    if info["is_wsl"]:
+        info["windows_home"] = f"/mnt/c/Users/{os.environ.get('USER','Aorus')}"
+    return info
+
+
+def check_mempalace(system: dict) -> dict:
+    paths = [Path(os.path.expanduser("~/.mempalace"))]
+    if system.get("windows_home"):
+        paths.append(Path(system["windows_home"]) / ".mempalace")
+    for p in paths:
+        for dbname in ["knowledge_graph.sqlite3", "memories.db"]:
+            db = p / dbname
+            if db.exists():
+                return {"path": str(p), "db": str(db), "exists": True}
+    return {"path": "", "db": "", "exists": False}
+
+
+def cmd_status():
+    """Quick status check."""
+    config_path = EDGE_HOME / "config.json"
+    config = {}
+    if config_path.exists():
+        with open(config_path) as f:
+            config = json.load(f)
+
+    node = config.get("node_name", "not configured")
+    nid = config.get("node_id", "?")
+    cloud = config.get("cloud_url", "not set")
+    print(f"ClawShell Edge {VERSION}")
+    print(f"  Node: {node} ({nid})")
+    print(f"  Cloud: {cloud}")
+
+    try:
+        import urllib.request
+        resp = urllib.request.urlopen(f"{cloud}/health", timeout=5)
+        data = json.loads(resp.read().decode())
+        active = sum(1 for v in data.get("engines", {}).values() if v == "active")
+        print(f"  CloudHub: ONLINE ({active} engines, v{data.get('version','?')})")
+    except:
+        print(f"  CloudHub: OFFLINE")
+
+    # MemOS bridge
+    try:
+        import urllib.request
+        urllib.request.urlopen("http://127.0.0.1:18800/health", timeout=2)
+        print(f"  MemOS Local: running (port 18800)")
+    except:
+        print(f"  MemOS Local: not running")
+
+
+def run_install(dry_run=False, quick=False):
+    print(BANNER)
+
+    # Step 1
+    print("┌─ Step 1/5: System Detection")
+    sys_info = detect_system()
+    print(f"  OS: {sys_info['os']} {sys_info['os_version']} WSL={sys_info['is_wsl']}")
+
+    # Step 2
+    print(f"\n┌─ Step 2/5: Framework Detection")
+    frameworks = detect_frameworks()
+    if frameworks:
+        for fw in frameworks:
+            extra = f" ({len(fw.get('users',[]))} users)" if fw.get("users") else ""
+            print(f"    ✅ {fw['name']} ({fw['type']}){extra}")
+    else:
+        print("  ⚠ No frameworks detected")
+
+    # Step 3
+    print(f"\n┌─ Step 3/5: CloudHub Connection")
+    cloud_url = DEFAULT_CLOUD_URL if quick else ask("CloudHub URL", DEFAULT_CLOUD_URL)
+    try:
+        import urllib.request
+        data = json.loads(urllib.request.urlopen(f"{cloud_url}/health", timeout=5).read())
+        active = sum(1 for v in data.get("engines", {}).values() if v == "active")
+        print(f"  ✅ Connected ({active} engines, v{data.get('version','?')})")
+    except Exception as e:
+        print(f"  ⚠ Unreachable: {e}")
+
+    node_name = "My-Edge" if quick else ask("Edge node name", f"{platform.node()}-Edge")
+    node_id = f"edge-{uuid.uuid4().hex[:8]}"
+
+    # Step 4
+    print(f"\n┌─ Step 4/5: Memory System")
+    mempalace = check_mempalace(sys_info)
+    print(f"  MemPalace: {'✅ ' + mempalace['path'] if mempalace['exists'] else '⚠ not found'}")
+    memos_cloud_key = "" if quick else ask("MemOS Cloud API Key (Enter to skip)", "")
+    memos_local = True if quick else confirm("Start MemOS Local Bridge?", True)
+
+    # Step 5
+    print(f"\n┌─ Step 5/5: Framework Injection")
+    inject_targets = []
+    for fw in frameworks:
+        if quick or confirm(f"  Inject into {fw['name']}?", True):
+            inject_targets.append(fw)
+
+    # Summary
+    print(f"\n{'─'*50}\n  Summary:")
+    print(f"    CloudHub: {cloud_url}")
+    print(f"    Node: {node_name} ({node_id})")
+    print(f"    Frameworks: {[f['name'] for f in inject_targets] or 'none'}")
+    print(f"    MemPalace: {'configured' if mempalace['exists'] else 'create new'}")
+    print(f"    MemOS Local: {'Yes' if memos_local else 'No'}")
+    print(f"    MemOS Cloud: {'configured' if memos_cloud_key else 'skipped'}")
+
+    if dry_run:
+        print(f"\n  ⓘ Dry run — no changes.\n")
+        return
+
+    if not quick and not confirm("\n  Proceed?", True):
+        print("  ✖ Cancelled\n"); return
+
+    # Execute
+    print(f"\n{'─'*50}\n  Installing...\n")
+    steps = [
+        ("Repo", lambda: CLAWSHELL_HOME.exists() or subprocess.run(["git", "clone", REPO_URL, str(CLAWSHELL_HOME)], check=False)),
+        ("Deps", lambda: subprocess.run([sys.executable, "-m", "pip", "install", "--break-system-packages", "psutil", "requests", "pyyaml", "aiohttp"], capture_output=True)),
+        ("Config", lambda: _save_config(EDGE_HOME, cloud_url, node_id, node_name, inject_targets, mempalace, memos_cloud_key)),
+        ("MemPalace", lambda: _setup_mempalace(mempalace)),
+        ("MemOS Bridge", lambda: _start_bridge(memos_local)),
+        ("Inject", lambda: _inject_frameworks(inject_targets, cloud_url, node_id, mempalace, memos_cloud_key)),
+        ("CLI", lambda: _install_cli()),
+    ]
+    for i, (name, fn) in enumerate(steps):
+        print(f"  [{i+1}/7] {name}...", end=" ")
+        try:
+            fn()
+            print("✅")
+        except Exception as e:
+            print(f"⚠ {e}")
+
+    print(f"\n{'═'*50}")
+    print(f"  ✅ ClawShell Edge {VERSION} installed!")
+    print(f"  Node: {node_name} | CloudHub: {cloud_url}")
+    print(f"  Run: clawshell status\n")
+
+
+def _save_config(edge_home, cloud_url, node_id, node_name, inject_targets, mempalace, memos_cloud_key):
+    edge_home.mkdir(parents=True, exist_ok=True)
+    config = {
+        "cloud_url": cloud_url, "node_id": node_id, "node_name": node_name,
+        "sync_interval": 5, "auto_register": True,
+        "ecosystem_components": [f["name"] for f in inject_targets],
+        "adapters": {f["name"]: {"enabled": True, "home": f["home"]} for f in inject_targets},
+        "memory": {"mempalace_path": mempalace.get("path", "~/.mempalace"),
+                   "memos_cloud_api_key": memos_cloud_key,
+                   "memos_cloud_user_id": "1062695814-580275369"}
+    }
+    with open(edge_home / "config.json", "w") as f:
+        json.dump(config, f, indent=2)
+
+
+def _setup_mempalace(mempalace):
+    link = Path(os.path.expanduser("~/.mempalace"))
+    if mempalace["exists"] and not link.exists():
+        target = mempalace["path"]
+        if target != str(link):
+            os.symlink(target, str(link))
+
+
+def _start_bridge(enable):
+    if not enable: return
+    bridge = CLAWSHELL_HOME / "edge" / "mcp" / "memos_local_bridge.py"
+    if bridge.exists():
+        subprocess.Popen([sys.executable, str(bridge)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def _inject_frameworks(targets, cloud_url, node_id, mempalace, memos_cloud_key):
+    sys.path.insert(0, str(CLAWSHELL_HOME))
+    config = json.load(open(EDGE_HOME / "config.json"))
+    for fw in targets:
+        if fw["name"] == "hermes":
+            from edge.adapters.hermes_adapter import HermesAdapter
+            HermesAdapter(config_path=fw["home"]).inject(config=config)
+        elif fw["name"] == "wukong":
+            from edge.adapters.wukong_adapter import WukongAdapter
+            WukongAdapter(runtime_path=fw["home"]).inject(config=config)
+            _setup_wukong_mcp(fw, config, mempalace, memos_cloud_key)
+
+
+def _setup_wukong_mcp(fw, config, mempalace, memos_cloud_key):
+    home = Path(fw["home"])
+    for item in home.iterdir():
+        if not item.is_dir() or item.name.startswith("."): continue
+        mcp_file = item / ".mcp" / "mcpServerConfig.json"
+        if not mcp_file.exists(): continue
+        with open(mcp_file) as f:
+            mcp = json.load(f)
+        mcp["mcpServers"]["clawshell-edge"] = {
+            "isActive": True, "name": "ClawShell边缘端脑", "type": "stdio",
+            "timeout": 120, "command": "wsl",
+            "args": ["-d","Ubuntu","--","bash","-c", f"cd {CLAWSHELL_HOME} && python3 -m edge.mcp.edge_server"],
+            "env": {"CLAWSHELL_CLOUD_URL": config["cloud_url"],
+                    "CLAWSHELL_EDGE_HOME": str(EDGE_HOME),
+                    "CLAWSHELL_REPO": str(CLAWSHELL_HOME),
+                    "CLAWSHELL_NODE_ID": config["node_id"]}
+        }
+        mcp["mcpServers"]["clawshell-memory"] = {
+            "isActive": True, "name": "统一记忆系统", "type": "stdio",
+            "timeout": 60, "command": "wsl",
+            "args": ["-d","Ubuntu","--","bash","-c", f"cd {CLAWSHELL_HOME} && PYTHONPATH={CLAWSHELL_HOME} python3 -m edge.mcp.memory_server"],
+            "env": {"MEMPALACE_PATH": mempalace.get("path", str(Path.home()/".mempalace")),
+                    "PYTHONPATH": str(CLAWSHELL_HOME),
+                    "MEMOS_CLOUD_URL": "https://memos.memtensor.cn/api/openmem/v1",
+                    "MEMOS_CLOUD_USER_ID": "1062695814-580275369",
+                    "MEMOS_CLOUD_API_KEY": memos_cloud_key,
+                    "MEMOS_LOCAL_URL": "http://127.0.0.1:18800"}
+        }
+        with open(mcp_file, "w") as f:
+            json.dump(mcp, f, indent=2, ensure_ascii=False)
+
+
+def _install_cli():
+    local_bin = Path(os.path.expanduser("~/.local/bin"))
+    local_bin.mkdir(parents=True, exist_ok=True)
+    link = local_bin / "clawshell"
+    if link.exists(): link.unlink()
+    link.symlink_to(str(CLAWSHELL_HOME / "bin" / "clawshell"))
+
+
+# ── Entry ──────────────────────────────────────────────────────
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print(f"ClawShell Edge CLI {VERSION}")
+        print("Usage: clawshell {install|status}")
+        print("  install    Interactive setup wizard")
+        print("  status     Show Edge + CloudHub status")
+        sys.exit(0)
+
+    cmd = sys.argv[1]
+    if cmd == "install":
+        run_install(dry_run="--dry-run" in sys.argv, quick="--quick" in sys.argv)
+    elif cmd == "status":
+        cmd_status()
+    else:
+        edge_cli = CLAWSHELL_HOME / "bin" / "clawshell-edge"
+        if edge_cli.exists():
+            os.execv(sys.executable, [sys.executable, str(edge_cli)] + sys.argv[1:])
+        else:
+            print(f"Unknown command: {cmd}")
+            sys.exit(1)
