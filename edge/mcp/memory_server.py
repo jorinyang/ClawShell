@@ -61,23 +61,29 @@ def search_mempalace(query: str, limit: int = 10) -> List[dict]:
 
 
 def search_memos_cloud(query: str, limit: int = 10) -> List[dict]:
-    """Search MemOS Cloud API."""
+    """Search MemOS Cloud API (Token auth, POST /search/memory)."""
     results = []
     if MEMOS_CLOUD_API_KEY:
         try:
-            r = http.get(
-                f"{MEMOS_CLOUD_URL}/search",
-                params={"q": query, "limit": limit, "user_id": MEMOS_CLOUD_USER_ID},
-                headers={"Authorization": f"Bearer {MEMOS_CLOUD_API_KEY}"},
+            r = http.post(
+                f"{MEMOS_CLOUD_URL}/search/memory",
+                json={"user_id": MEMOS_CLOUD_USER_ID, "query": query, "limit": limit},
+                headers={
+                    "Authorization": f"Token {MEMOS_CLOUD_API_KEY}",
+                    "Content-Type": "application/json",
+                },
                 timeout=10,
             )
             if r.ok:
                 data = r.json()
-                for item in (data if isinstance(data, list) else data.get("results", [])):
-                    results.append({
-                        "source": "memos_cloud",
-                        "content": str(item)[:300],
-                    })
+                items = data.get("results", data.get("data", []))
+                if isinstance(items, list):
+                    for item in items:
+                        results.append({
+                            "source": "memos_cloud",
+                            "content": str(item.get("content", item))[:300],
+                            "key": str(item.get("id", "")),
+                        })
         except Exception:
             pass
     return results
@@ -153,13 +159,16 @@ def tool_memory_store(args: dict) -> dict:
         except Exception:
             pass
 
-    # Store to MemOS Cloud
+    # Store to MemOS Cloud (Token auth, POST /message)
     if MEMOS_CLOUD_API_KEY:
         try:
             r = http.post(
-                f"{MEMOS_CLOUD_URL}/memories",
-                json={"content": content, "user_id": MEMOS_CLOUD_USER_ID},
-                headers={"Authorization": f"Bearer {MEMOS_CLOUD_API_KEY}"},
+                f"{MEMOS_CLOUD_URL}/message",
+                json={"user_id": MEMOS_CLOUD_USER_ID, "content": content, "role": "user"},
+                headers={
+                    "Authorization": f"Token {MEMOS_CLOUD_API_KEY}",
+                    "Content-Type": "application/json",
+                },
                 timeout=10,
             )
             if r.ok:
@@ -191,18 +200,23 @@ def tool_memory_stats(args: dict) -> dict:
 
     if MEMOS_CLOUD_API_KEY:
         try:
-            r = http.get(
-                f"{MEMOS_CLOUD_URL}/search",
-                params={"q": "health_check", "user_id": MEMOS_CLOUD_USER_ID, "limit": 1},
-                headers={"Authorization": f"Bearer {MEMOS_CLOUD_API_KEY}"},
+            r = http.post(
+                f"{MEMOS_CLOUD_URL}/search/memory",
+                json={"user_id": MEMOS_CLOUD_USER_ID, "query": "health_check", "limit": 1},
+                headers={
+                    "Authorization": f"Token {MEMOS_CLOUD_API_KEY}",
+                    "Content-Type": "application/json",
+                },
                 timeout=10,
             )
             if r.ok:
                 stats["memos_cloud"] = "connected"
+            elif r.status_code == 400:
+                stats["memos_cloud"] = "connected (API OK — no memories yet)"
             elif r.status_code == 500:
-                stats["memos_cloud"] = "degraded (server error — API key may need refresh)"
+                stats["memos_cloud"] = "degraded (server error)"
             else:
-                stats["memos_cloud"] = f"error ({r.status_code})"
+                stats["memos_cloud"] = f"error (HTTP {r.status_code})"
         except Exception:
             stats["memos_cloud"] = "unreachable"
 
