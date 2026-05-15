@@ -28,6 +28,7 @@ _broadcast = None
 _n8n_bridge = None
 _insight = None  # v1.9.0 InsightEngine
 _brain = None    # v1.12.0 CloudBrain LLM analyst
+_vault_api = None  # v1.12.0 VaultAPI — OSS-backed Obsidian vault
 
 
 def set_engines(**kwargs):
@@ -63,6 +64,7 @@ def create_app() -> FastAPI:
     app.state.n8n_bridge = _n8n_bridge
     app.state.insight = _insight
     app.state.brain = _brain
+    app.state.vault_api = _vault_api  # v1.12.0
 
     @app.middleware("http")
     async def cors_middleware(request, call_next):
@@ -106,6 +108,7 @@ def create_app() -> FastAPI:
         insights_router, broadcasts_router, reviews_router, evolution_router
     )
     from cloud.routers.brain import brain_router  # v1.12.0
+    from cloud.routers.vault import vault_router  # v1.12.0 — OSS Vault
 
     app.include_router(events_router, prefix="/api/v1")
     app.include_router(nodes_router, prefix="/api/v1")
@@ -116,6 +119,7 @@ def create_app() -> FastAPI:
     app.include_router(reviews_router, prefix="/api/v1")
     app.include_router(evolution_router, prefix="/api/v1")
     app.include_router(brain_router, prefix="/api/v1")  # v1.12.0
+    app.include_router(vault_router, prefix="/api/v1")  # v1.12.0 — OSS Vault
 
     return app
 
@@ -142,6 +146,7 @@ def init_engines():
     global _evolution, _review, _broadcast, _n8n_bridge
     global _insight  # v1.9.0
     global _brain    # v1.12.0
+    global _vault_api  # v1.12.0
 
     _eventbus = CloudEventBus(data_dir=config.data_dir)
     _eventbus.start_cleanup_daemon()
@@ -181,7 +186,17 @@ def init_engines():
     _brain = CloudAnalyst(eventbus=_eventbus, data_dir=config.data_dir)
     _brain.start()
 
-    logging.info(f"All 11 engines initialized (v1.12.0) — Brain LLM: {_brain._llm.is_configured}")
+    # v1.12.0 — VaultAPI: OSS-backed Obsidian vault CRUD + sync
+    from cloud.services.vault_api import VaultAPI
+    _vault_api = VaultAPI(
+        vault_path=os.environ.get("CLAWSHELL_VAULT_PATH", "/opt/clawshell/data/vault"),
+        oss_bucket=os.environ.get("OSS_BUCKET", "clawshell-vault"),
+        oss_endpoint=os.environ.get("OSS_ENDPOINT", "oss-cn-hongkong.aliyuncs.com"),
+        oss_key_id=os.environ.get("OSS_ACCESS_KEY_ID", ""),
+        oss_key_secret=os.environ.get("OSS_ACCESS_KEY_SECRET", ""),
+    )
+
+    logging.info(f"All 12 engines initialized (v1.12.0) — Brain LLM: {_brain._llm.is_configured}, Vault OSS: {bool(_vault_api._oss_key_id)}")
 
 
 def main():
