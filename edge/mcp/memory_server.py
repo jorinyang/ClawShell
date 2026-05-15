@@ -160,6 +160,7 @@ def tool_memory_store(args: dict) -> dict:
             pass
 
     # Store to MemOS Cloud (Token auth, POST /message)
+    # Note: Write operations may return 500 if API key has read-only permissions
     if MEMOS_CLOUD_API_KEY:
         try:
             r = http.post(
@@ -173,6 +174,8 @@ def tool_memory_store(args: dict) -> dict:
             )
             if r.ok:
                 stored.append("memos_cloud")
+            elif r.status_code == 500:
+                pass  # API key may have read-only permissions — silently skip
         except Exception:
             pass
 
