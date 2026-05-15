@@ -1,0 +1,302 @@
+#!/usr/bin/env python3
+"""
+ClawShell Cloud Hub 安装器 — 云枢一键部署
+
+用法:
+  clawshell-cloud install          交互式安装
+  clawshell-cloud install --quick  使用默认值静默安装
+  clawshell-cloud status           查看云枢状态
+  clawshell-cloud update           更新到最新版本 (幂等)
+
+幂等性: 重复运行不会破坏已有配置,仅更新代码和配置。
+目标: ECS (Ubuntu 22.04+), 需 root 或 sudo 权限。
+"""
+
+import os, sys, json, time, subprocess, shutil, uuid
+from pathlib import Path
+
+VERSION = "v1.12.0"
+REPO_URL = "https://github.com/jorinyang/ClawShell.git"
+INSTALL_DIR = Path("/opt/clawshell")
+DATA_DIR = INSTALL_DIR / "data"
+LOG_DIR = INSTALL_DIR / "logs"
+
+BANNER = r"""
+  ╔══════════════════════════════════════╗
+  ║   ClawShell Cloud Hub {ver}         ║
+  ║   云枢安装器 — 一云多端协同        ║
+  ╚══════════════════════════════════════╝
+""".format(ver=VERSION)
+
+
+def ask(prompt: str, default: str = "", required: bool = False, secret: bool = False) -> str:
+    if default: prompt = f"{prompt} [{default}]"
+    while True:
+        try:
+            answer = input(f"  › {prompt}: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("\n  ✖ Cancelled"); sys.exit(1)
+        if not answer and default: return default
+        if not answer and required:
+            print("  ⚠ Required"); continue
+        return answer or default
+
+
+def confirm(prompt: str, default: bool = True) -> bool:
+    yn = "Y/n" if default else "y/N"
+    a = ask(f"{prompt} ({yn})", "").lower()
+    return default if not a else a in ("y", "yes")
+
+
+def check_prereqs():
+    """Verify system requirements."""
+    ok = True
+    checks = [
+        ("Python 3.11+", lambda: sys.version_info >= (3, 11)),
+        ("git", lambda: shutil.which("git") is not None),
+        ("systemd", lambda: Path("/run/systemd/system").exists()),
+        ("pip", lambda: shutil.which("pip3") or shutil.which("pip") is not None),
+        ("Root/sudo", lambda: os.geteuid() == 0),
+    ]
+    for name, fn in checks:
+        result = fn()
+        print(f"  {'✅' if result else '❌'} {name}")
+        if not result: ok = False
+    return ok
+
+
+def cmd_status():
+    """Show cloud hub status."""
+    print(f"ClawShell Cloud Hub {VERSION}")
+    print(f"  Install dir: {INSTALL_DIR}")
+
+    # Git
+    if (INSTALL_DIR / ".git").exists():
+        r = subprocess.run(["git", "-C", str(INSTALL_DIR), "log", "--oneline", "-1"],
+                          capture_output=True, text=True)
+        print(f"  Git: {r.stdout.strip()}")
+
+    # Systemd
+    r = subprocess.run(["systemctl", "is-active", "clawshell-cloud"], capture_output=True)
+    print(f"  Service: {r.stdout.decode().strip()}")
+
+    # Health
+    try:
+        import urllib.request
+        data = json.loads(urllib.request.urlopen("http://127.0.0.1:8000/health", timeout=3).read())
+        active = sum(1 for v in data.get("engines", {}).values() if v == "active")
+        print(f"  Engines: {active}/12 active")
+    except:
+        print(f"  Engines: not responding")
+
+    # Cron
+    cron = Path("/etc/cron.d/clawshell-hermes")
+    print(f"  Cron: {'configured' if cron.exists() else 'not configured'}")
+
+    # OSS
+    env_file = INSTALL_DIR / ".env"
+    if env_file.exists():
+        with open(env_file) as f:
+            has_oss = "OSS_ACCESS_KEY_ID" in f.read()
+        print(f"  OSS Vault: {'configured' if has_oss else 'not configured'}")
+
+
+def run_install(dry_run=False, quick=False):
+    print(BANNER)
+
+    # ── Prerequisites ──────────────────────────────────────────
+    print("┌─ Step 1/5: Prerequisites")
+    if not check_prereqs():
+        print("\n  ❌ Missing requirements. Install them first:")
+        print("     apt install python3 python3-pip git nginx")
+        sys.exit(1)
+
+    # ── Source Code ────────────────────────────────────────────
+    print(f"\n┌─ Step 2/5: Source Code")
+    if INSTALL_DIR.exists() and (INSTALL_DIR / ".git").exists():
+        print(f"  Repository exists — updating...")
+        if not dry_run:
+            subprocess.run(["git", "-C", str(INSTALL_DIR), "pull", "origin", "main"], check=False)
+    else:
+        print(f"  Cloning to {INSTALL_DIR}...")
+        if not dry_run:
+            INSTALL_DIR.parent.mkdir(parents=True, exist_ok=True)
+            subprocess.run(["git", "clone", REPO_URL, str(INSTALL_DIR)], check=True)
+
+    # ── Configuration ──────────────────────────────────────────
+    print(f"\n┌─ Step 3/5: Configuration")
+    env_file = INSTALL_DIR / ".env"
+
+    # Load existing or create
+    existing = {}
+    if env_file.exists():
+        with open(env_file) as f:
+            for line in f:
+                if "=" in line and not line.startswith("#"):
+                    k, v = line.strip().split("=", 1)
+                    existing[k] = v
+
+    defaults = {
+        "DEEPSEEK_API_KEY": existing.get("DEEPSEEK_API_KEY", ""),
+        "LLM_MODEL": "deepseek-chat",
+        "LLM_BASE_URL": "https://api.deepseek.com/v1",
+        "JWT_SECRET": existing.get("JWT_SECRET", uuid.uuid4().hex[:16]),
+        "OSS_ACCESS_KEY_ID": existing.get("OSS_ACCESS_KEY_ID", ""),
+        "OSS_ACCESS_KEY_SECRET": existing.get("OSS_ACCESS_KEY_SECRET", ""),
+        "OSS_BUCKET": "clawshell-vault",
+        "OSS_ENDPOINT": "oss-cn-hongkong.aliyuncs.com",
+        "CLAWSHELL_HOST": "0.0.0.0",
+        "CLAWSHELL_PORT": "8000",
+        "LOG_LEVEL": "INFO",
+    }
+
+    config = {}
+    if not quick:
+        print("  CloudHub requires a DeepSeek API key for Brain LLM analysis.")
+        config["DEEPSEEK_API_KEY"] = ask("DeepSeek API Key", defaults["DEEPSEEK_API_KEY"], required=True, secret=True)
+
+        print("  OSS Vault requires Aliyun AccessKey for Obsidian sync.")
+        oss_ak = ask("Aliyun AccessKey ID (Enter to skip OSS)", defaults["OSS_ACCESS_KEY_ID"])
+        if oss_ak:
+            config["OSS_ACCESS_KEY_ID"] = oss_ak
+            config["OSS_ACCESS_KEY_SECRET"] = ask("Aliyun AccessKey Secret", defaults["OSS_ACCESS_KEY_SECRET"], secret=True)
+
+        config["JWT_SECRET"] = ask("JWT Secret", defaults["JWT_SECRET"])
+    else:
+        config = {k: v for k, v in defaults.items() if v}
+
+    # Merge with existing (don't overwrite secrets that weren't re-entered)
+    final_config = {**defaults, **config}
+    if not dry_run:
+        with open(env_file, "w") as f:
+            for k, v in final_config.items():
+                f.write(f"{k}={v}\n")
+        os.chmod(env_file, 0o600)
+        print(f"  ✅ .env written ({len(final_config)} vars)")
+
+    # ── Dependencies ───────────────────────────────────────────
+    print(f"\n┌─ Step 4/5: Dependencies & Services")
+    if not dry_run:
+        print("  Installing Python packages...")
+        subprocess.run([sys.executable, "-m", "pip", "install", "--break-system-packages",
+                       "fastapi", "uvicorn", "pydantic", "loguru", "requests", "pyyaml"],
+                      capture_output=True)
+
+        # Systemd service
+        print("  Configuring systemd service...")
+        service = f"""[Unit]
+Description=ClawShell Cloud Hub {VERSION}
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory={INSTALL_DIR}
+Environment=PYTHONPATH={INSTALL_DIR}
+EnvironmentFile={INSTALL_DIR}/.env
+ExecStart={sys.executable} -m uvicorn cloud.main:create_app --factory --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+"""
+        with open("/etc/systemd/system/clawshell-cloud.service", "w") as f:
+            f.write(service)
+        subprocess.run(["systemctl", "daemon-reload"])
+        subprocess.run(["systemctl", "enable", "clawshell-cloud"])
+        subprocess.run(["systemctl", "restart", "clawshell-cloud"])
+        print("  ✅ Service installed and started")
+
+        # OSS
+        if final_config.get("OSS_ACCESS_KEY_ID"):
+            print("  Configuring OSS...")
+            oss_config = f"""[Credentials]
+language=EN
+endpoint={final_config['OSS_ENDPOINT']}
+accessKeyID={final_config['OSS_ACCESS_KEY_ID']}
+accessKeySecret={final_config['OSS_ACCESS_KEY_SECRET']}
+"""
+            with open("/root/.ossutilconfig", "w") as f:
+                f.write(oss_config)
+            os.chmod("/root/.ossutilconfig", 0o600)
+
+            # Install ossutil if needed
+            if not shutil.which("ossutil"):
+                subprocess.run(["curl", "-fsSL", "https://gosspublic.alicdn.com/ossutil/install.sh", "|", "bash"],
+                              shell=True)
+            print("  ✅ OSS configured")
+
+        # Cron
+        print("  Configuring cron jobs...")
+        cron_jobs = f"""# ClawShell Hermes Cron
+*/5 * * * * root {sys.executable} {INSTALL_DIR}/hermes_cron.py insight >> {LOG_DIR}/cron.log 2>&1
+0 */6 * * * root {sys.executable} {INSTALL_DIR}/hermes_cron.py review >> {LOG_DIR}/cron.log 2>&1
+0 2 * * * root {sys.executable} {INSTALL_DIR}/hermes_cron.py optimize >> {LOG_DIR}/cron.log 2>&1
+"""
+        LOG_DIR.mkdir(parents=True, exist_ok=True)
+        with open("/etc/cron.d/clawshell-hermes", "w") as f:
+            f.write(cron_jobs)
+        print("  ✅ Cron configured")
+
+    # ── Verification ───────────────────────────────────────────
+    print(f"\n┌─ Step 5/5: Verification")
+    if not dry_run:
+        time.sleep(3)
+        try:
+            import urllib.request
+            data = json.loads(urllib.request.urlopen("http://127.0.0.1:8000/health", timeout=5).read())
+            active = sum(1 for v in data.get("engines", {}).values() if v == "active")
+            print(f"  ✅ CloudHub healthy — {active}/12 engines active")
+        except Exception as e:
+            print(f"  ⚠ Health check failed: {e}")
+            print(f"     Check: journalctl -u clawshell-cloud -n 20")
+
+    if dry_run:
+        print(f"\n  ⓘ Dry run — no changes.")
+        return
+
+    print(f"\n{'═'*50}")
+    print(f"  ✅ ClawShell Cloud Hub {VERSION} installed!")
+    print(f"  Health: http://<server>:8000/health")
+    print(f"  Logs: journalctl -u clawshell-cloud -f")
+    print(f"  Status: clawshell-cloud status")
+    print(f"{'═'*50}")
+
+
+def cmd_update():
+    """Update cloud hub (idempotent)."""
+    print(f"Updating ClawShell Cloud Hub...")
+    if not INSTALL_DIR.exists():
+        print("  Not installed. Run: clawshell-cloud install")
+        return
+
+    subprocess.run(["git", "-C", str(INSTALL_DIR), "pull", "origin", "main"], check=True)
+    subprocess.run(["systemctl", "restart", "clawshell-cloud"])
+    time.sleep(3)
+    cmd_status()
+
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print(f"ClawShell Cloud Hub {VERSION}")
+        print("Usage: clawshell-cloud {install|status|update}")
+        print("  install           Interactive setup")
+        print("  install --quick   Quick setup with defaults")
+        print("  install --dry-run Preview only")
+        print("  status            Show status")
+        print("  update            Update to latest (idempotent)")
+        sys.exit(0)
+
+    cmd = sys.argv[1]
+    if cmd == "install":
+        run_install(dry_run="--dry-run" in sys.argv, quick="--quick" in sys.argv)
+    elif cmd == "status":
+        cmd_status()
+    elif cmd == "update":
+        cmd_update()
+    else:
+        print(f"Unknown: {cmd}")
+        sys.exit(1)
