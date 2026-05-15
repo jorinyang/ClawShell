@@ -29,6 +29,14 @@ from typing import Any, Dict, List, Optional
 MEMPALACE_PATH = Path(os.environ.get("MEMPALACE_PATH", os.path.expanduser("~/.mempalace")))
 MEMOS_CLOUD_URL = os.environ.get("MEMOS_CLOUD_URL", "https://memos.memtensor.cn/api/openmem/v1")
 MEMOS_CLOUD_API_KEY = os.environ.get("MEMOS_CLOUD_API_KEY", "")
+# ── Cloud API Key file fallback ─────────────────────────────────
+if not MEMOS_CLOUD_API_KEY:
+    _key_file = Path(os.path.expanduser('~/.openclaw/.cloud_env'))
+    if _key_file.exists():
+        for _line in _key_file.read_text().splitlines():
+            if _line.startswith('MEMOS_CLOUD_API_KEY='):
+                MEMOS_CLOUD_API_KEY = _line.split('=',1)[1].strip()
+                break
 MEMOS_CLOUD_USER_ID = os.environ.get("MEMOS_CLOUD_USER_ID", "1062695814-580275369")
 MEMOS_LOCAL_URL = os.environ.get("MEMOS_LOCAL_URL", "http://127.0.0.1:18800")
 CLOUDHUB_URL = os.environ.get("CLAWSHELL_CLOUD_URL", "http://47.239.71.174")  # v1.12.0: 事件推送
@@ -203,8 +211,8 @@ def tool_memory_store(args: dict) -> dict:
             )
             if r.ok:
                 stored.append("memos_cloud")
-            elif r.status_code == 500:
-                pass  # API key may have read-only permissions — silently skip
+            # Silently skip on auth/permission errors (403=forbidden, 500=server error)
+            # MemOS Cloud store is best-effort; MemPalace is the authoritative store
         except Exception:
             pass
 
