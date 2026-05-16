@@ -1,0 +1,78 @@
+# ClawShell Cloud Hub — Docker Compose v2.0
+# 3-service stack: API + Web Frontend + Nginx reverse proxy
+
+services:
+  clawshell-api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    container_name: clawshell-api
+    ports:
+      - "8000:8000"
+    environment:
+      - CLAWSHELL_CLOUD_HOST=0.0.0.0
+      - CLAWSHELL_CLOUD_PORT=8000
+      - CLAWSHELL_DEBUG=${CLAWSHELL_DEBUG:-false}
+      - CLAWSHELL_DATA_DIR=/data
+      - CLAWSHELL_DB_PATH=/data/clawshell.db
+      - CLAWSHELL_API_TOKEN=${CLAWSHELL_API_TOKEN:-}
+      - JWT_SECRET=${JWT_SECRET:-clawshell-jwt-secret-2026}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-clawshell-enc-key-2026-32b!}
+      - JWT_EXPIRE_HOURS=${JWT_EXPIRE_HOURS:-24}
+      - CLAWSHELL_MEMOS_API_KEY=${CLAWSHELL_MEMOS_API_KEY:-}
+      - CLAWSHELL_MEMOS_USER_ID=${CLAWSHELL_MEMOS_USER_ID:-}
+      - CLAWSHELL_ALIYUN_AK_ID=${CLAWSHELL_ALIYUN_AK_ID:-}
+      - CLAWSHELL_ALIYUN_AK_SECRET=${CLAWSHELL_ALIYUN_AK_SECRET:-}
+      - CLAWSHELL_OSS_ENDPOINT=${CLAWSHELL_OSS_ENDPOINT:-}
+      - CLAWSHELL_OSS_BUCKET=${CLAWSHELL_OSS_BUCKET:-clawshell-vault}
+      - CLAWSHELL_N8N_URL=${CLAWSHELL_N8N_URL:-http://localhost:5678}
+    volumes:
+      - clawshell_data:/data
+    restart: unless-stopped
+    networks:
+      - clawshell-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  clawshell-web:
+    build:
+      context: ../web
+      dockerfile: Dockerfile
+    container_name: clawshell-web
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-https://clawshell.club}
+      - NODE_ENV=production
+    restart: unless-stopped
+    networks:
+      - clawshell-net
+    depends_on:
+      - clawshell-api
+
+  clawshell-nginx:
+    image: nginx:alpine
+    container_name: clawshell-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/certbot:/var/www/certbot:ro
+    restart: unless-stopped
+    networks:
+      - clawshell-net
+    depends_on:
+      - clawshell-api
+      - clawshell-web
+
+volumes:
+  clawshell_data:
+
+networks:
+  clawshell-net:
+    driver: bridge

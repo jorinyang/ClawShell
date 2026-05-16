@@ -1,0 +1,127 @@
+{
+  "sidebar": {
+    "dashboard": "概览",
+    "system": "系统监控",
+    "nodes": "终端管理",
+    "users": "用户管理",
+    "credentials": "凭证管理",
+    "endpoints": "端点配置",
+    "audit": "审计日志"
+  },
+  "topbar": {
+    "logout": "退出登录",
+    "changePassword": "修改密码",
+    "profile": "个人信息"
+  },
+  "login": {
+    "title": "ClawShell 管理后台",
+    "accountId": "账户ID",
+    "password": "密码",
+    "submit": "登录",
+    "error": "登录失败，请检查账户和密码"
+  },
+  "changePassword": {
+    "title": "修改密码",
+    "oldPassword": "当前密码",
+    "newPassword": "新密码",
+    "confirmPassword": "确认新密码",
+    "submit": "确认修改",
+    "success": "密码修改成功",
+    "mismatch": "两次输入的密码不一致"
+  },
+  "dashboard": {
+    "title": "系统概览",
+    "totalUsers": "用户总数",
+    "onlineNodes": "在线节点",
+    "todayEvents": "今日事件",
+    "activeTasks": "活跃任务",
+    "engineStatus": "引擎状态",
+    "systemResources": "系统资源",
+    "recentActivity": "最近活动"
+  },
+  "system": {
+    "title": "系统监控",
+    "engines": "引擎状态",
+    "cpu": "CPU",
+    "memory": "内存",
+    "disk": "磁盘",
+    "network": "网络"
+  },
+  "nodes": {
+    "title": "终端管理",
+    "name": "名称",
+    "status": "状态",
+    "os": "操作系统",
+    "ip": "IP地址",
+    "lastHeartbeat": "最后心跳",
+    "frameworks": "框架",
+    "ideTools": "IDE工具",
+    "actions": "操作",
+    "enable": "启用",
+    "disable": "禁用",
+    "remove": "移除",
+    "online": "在线",
+    "offline": "离线"
+  },
+  "users": {
+    "title": "用户管理",
+    "accountId": "账户ID",
+    "displayName": "显示名",
+    "role": "角色",
+    "status": "状态",
+    "lastLogin": "最后登录",
+    "actions": "操作",
+    "addUser": "添加用户",
+    "edit": "编辑",
+    "disable": "禁用",
+    "resetPassword": "重置密码",
+    "coreAdmin": "核心管理员",
+    "admin": "管理员",
+    "user": "普通用户"
+  },
+  "credentials": {
+    "title": "凭证管理",
+    "myCredentials": "我的凭证",
+    "sharedCredentials": "共享凭证",
+    "service": "服务",
+    "type": "类型",
+    "name": "名称",
+    "value": "值",
+    "description": "描述",
+    "actions": "操作",
+    "add": "添加凭证",
+    "edit": "编辑",
+    "delete": "删除"
+  },
+  "endpoints": {
+    "title": "端点配置",
+    "internal": "内部API端点",
+    "external": "外部服务端点",
+    "name": "名称",
+    "url": "URL",
+    "status": "状态",
+    "enabled": "启用",
+    "disabled": "禁用",
+    "rateLimit": "限流"
+  },
+  "audit": {
+    "title": "审计日志",
+    "user": "用户",
+    "action": "操作",
+    "target": "目标",
+    "ip": "IP地址",
+    "time": "时间",
+    "export": "导出CSV"
+  },
+  "common": {
+    "save": "保存",
+    "cancel": "取消",
+    "confirm": "确认",
+    "delete": "删除",
+    "search": "搜索",
+    "loading": "加载中...",
+    "noData": "暂无数据",
+    "success": "操作成功",
+    "error": "操作失败"
+  }
+}

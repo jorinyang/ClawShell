@@ -1,13 +1,16 @@
 """Edge Sync Daemon — Critical Cloud↔Edge synchronization.
 
-Architecture: scan→enqueue→flush→pull→health loop every 5 seconds.
+Architecture: scan→enqueue→flush→pull→health→credentials loop every 5 seconds.
 
 Components:
 - CloudClient: HTTP client for Cloud API (stdlib urllib, zero deps)
 - OfflineQueue: JSON file-backed queue (survives daemon restart)
 - LocalEventScanner: mtime-based change detection on EventBus files
 - HealthReporter: psutil metrics + service port checks
-- EdgeSyncDaemon: orchestrates the 8-step cycle loop
+- CredentialSyncer: credential sync + local store management
+- EdgeSyncDaemon: orchestrates the 9-step cycle loop
+
+v2.0: Added auth token refresh, credential sync, WebSocket push integration.
 """
 
 from __future__ import annotations
@@ -18,7 +21,10 @@ import glob
 import threading
 import urllib.request
 import urllib.error
+import logging
 from typing import Dict, List, Optional, Any
+
+logger = logging.getLogger(__name__)
 
 
 class CloudClient:
@@ -30,6 +36,15 @@ class CloudClient:
         self._token = edge_token
         self._edge_id = edge_id
         self._timeout = timeout
+        self._lock = threading.RLock()
+
+    @property
+    def token(self) -> str:
+        return self._token
+
+    @token.setter
+    def token(self, value: str):
+        self._token = value
 
     def _request(self, method: str, path: str, body: Optional[dict] = None) -> dict:
         url = f"{self._base_url}{path}"
@@ -41,7 +56,8 @@ class CloudClient:
         try:
             req = urllib.request.Request(url, data=data, headers=headers, method=method)
             resp = urllib.request.urlopen(req, timeout=self._timeout)
-            return json.loads(resp.read().decode())
+            raw = resp.read().decode()
+            return json.loads(raw) if raw else {}
         except urllib.error.HTTPError as e:
             return {"success": False, "error": f"HTTP {e.code}"}
         except Exception as e:
@@ -84,6 +100,26 @@ class CloudClient:
             return resp.get("status") == "healthy"
         except Exception:
             return False
+
+    # ── Auth API (v2.0) ────────────────────────────────
+
+    def refresh_token(self) -> Optional[str]:
+        """Refresh the JWT token. Returns new token or None."""
+        resp = self._request("POST", "/api/v2/auth/refresh")
+        if "token" in resp:
+            return resp["token"]
+        return None
+
+    def sync_credentials(self) -> dict:
+        """Pull credentials from cloud."""
+        resp = self._request("GET", "/api/v1/credentials/sync")
+        if "user_credentials" in resp or "shared_credentials" in resp:
+            return {
+                "success": True,
+                "user_credentials": resp.get("user_credentials", {}),
+                "shared_credentials": resp.get("shared_credentials", {}),
+            }
+        return {"success": False, "error": resp.get("error", "Sync failed")}
 
 
 class OfflineQueue:
@@ -165,16 +201,23 @@ class LocalEventScanner:
 
 
 class EdgeSyncDaemon:
-    """Orchestrates the Edge↔Cloud sync loop."""
+    """Orchestrates the Edge↔Cloud sync loop.
+
+    v2.0: Added token auto-refresh, credential sync on startup, and
+    WebSocket push integration via CredentialWSClient.
+    """
 
     SYNC_INTERVAL = 5  # seconds
     HEALTH_EVERY_N = 10  # Report health every 10 cycles
+    TOKEN_REFRESH_EVERY_N = 120  # Refresh token every 120 cycles (~10 min)
+    CRED_SYNC_EVERY_N = 60  # Sync credentials every 60 cycles (~5 min)
 
     def __init__(self, cloud_url: str, edge_token: str = "",
                  edge_id: str = "", data_dir: str = "~/.clawshell-edge"):
         self._data_dir = os.path.expanduser(data_dir)
         os.makedirs(self._data_dir, exist_ok=True)
 
+        self._cloud_url = cloud_url
         self._client = CloudClient(cloud_url, edge_token, edge_id)
         self._offline_queue = OfflineQueue(
             os.path.join(self._data_dir, "offline_events.json")
@@ -185,15 +228,56 @@ class EdgeSyncDaemon:
         self._insights_cache = os.path.join(self._data_dir, "cloud_insights.json")
         self._broadcasts_cache = os.path.join(self._data_dir, "cloud_broadcasts.json")
 
+        # v2.0: Credential store and WebSocket client
+        self._cred_store = None
+        self._ws_client = None
+        self._init_auth_components()
+
         # Stats
         self._stats: Dict[str, int] = {
             "events_synced": 0, "tasks_pulled": 0,
             "insights_pulled": 0, "broadcasts_pulled": 0,
             "health_reports": 0, "cycles": 0, "errors": 0,
+            "cred_syncs": 0, "token_refreshes": 0,
         }
 
         self._running = False
         self._thread: Optional[threading.Thread] = None
+
+    def _init_auth_components(self):
+        """Initialize credential store and WebSocket client."""
+        try:
+            from edge.auth.credential_store import LocalCredentialStore
+            self._cred_store = LocalCredentialStore(data_dir=self._data_dir)
+            logger.info("LocalCredentialStore initialized")
+        except ImportError:
+            logger.warning("CredentialStore not available")
+
+        # Start WebSocket client if we have a token
+        if self._client.token:
+            self._start_ws_client()
+
+    def _start_ws_client(self):
+        """Start the WebSocket client for real-time credential push."""
+        try:
+            from edge.auth.ws_client import CredentialWSClient
+            if self._ws_client and self._ws_client.connected:
+                return  # Already running
+
+            self._ws_client = CredentialWSClient(
+                cloud_url=self._cloud_url,
+                token=self._client.token,
+                on_change=self._on_cred_change,
+            )
+            self._ws_client.start()
+            logger.info("CredentialWSClient started")
+        except ImportError:
+            logger.debug("CredentialWSClient not available")
+
+    def _on_cred_change(self):
+        """Callback: credential change detected via WebSocket."""
+        logger.info("Credential change detected — triggering sync")
+        self._sync_credentials()
 
     # ── Daemon Lifecycle ──────────────────────────
 
@@ -204,8 +288,16 @@ class EdgeSyncDaemon:
         self._thread = threading.Thread(target=self._loop, daemon=True, name="edge-sync")
         self._thread.start()
 
+        # v2.0: Sync credentials on startup
+        if self._cred_store and self._client.token:
+            threading.Thread(
+                target=self._sync_credentials, daemon=True, name="startup-cred-sync"
+            ).start()
+
     def shutdown(self):
         self._running = False
+        if self._ws_client:
+            self._ws_client.stop()
         if self._thread:
             self._thread.join(timeout=10)
 
@@ -219,8 +311,9 @@ class EdgeSyncDaemon:
         while self._running:
             try:
                 self._sync_cycle()
-            except Exception:
+            except Exception as e:
                 self._stats["errors"] += 1
+                logger.error(f"Sync cycle error: {e}")
 
             # 5s chunks for fast shutdown
             for _ in range(self.SYNC_INTERVAL):
@@ -279,7 +372,82 @@ class EdgeSyncDaemon:
         if self._stats["cycles"] % self.HEALTH_EVERY_N == 0:
             self._report_health()
 
+        # 7. v2.0: Token refresh (every N cycles)
+        if (self._client.token and
+                self._stats["cycles"] % self.TOKEN_REFRESH_EVERY_N == 0):
+            self._refresh_token()
+
+        # 8. v2.0: Credential sync (every N cycles, if no WebSocket)
+        if (self._cred_store and self._client.token and
+                self._stats["cycles"] % self.CRED_SYNC_EVERY_N == 0):
+            if not (self._ws_client and self._ws_client.connected):
+                # Only poll if WebSocket is not connected
+                self._sync_credentials()
+
         return result
+
+    # ── v2.0: Auth Operations ─────────────────────
+
+    def _refresh_token(self):
+        """Auto-refresh JWT token before expiry."""
+        new_token = self._client.refresh_token()
+        if new_token:
+            self._client.token = new_token
+            self._stats["token_refreshes"] += 1
+            logger.info("Token refreshed successfully")
+
+            # Update session file
+            try:
+                session_path = os.path.expanduser("~/.clawshell-edge/session.json")
+                if os.path.exists(session_path):
+                    with open(session_path) as f:
+                        session = json.load(f)
+                    session["token"] = new_token
+                    with open(session_path, "w") as f:
+                        json.dump(session, f, indent=2)
+            except Exception:
+                pass
+
+            # Update WebSocket client token
+            if self._ws_client:
+                self._ws_client.update_token(new_token)
+        else:
+            logger.warning("Token refresh failed")
+
+    def _sync_credentials(self):
+        """Sync credentials from cloud to local store."""
+        if not self._cred_store:
+            return
+
+        try:
+            result = self._client.sync_credentials()
+            if result.get("success"):
+                user_creds = result.get("user_credentials", {})
+                shared_creds = result.get("shared_credentials", {})
+
+                # Flatten grouped creds
+                user_list = []
+                for service, creds in user_creds.items():
+                    user_list.extend(creds)
+                shared_list = []
+                for service, creds in shared_creds.items():
+                    shared_list.extend(creds)
+
+                if user_list:
+                    self._cred_store.merge_and_save(user_list)
+                if shared_list:
+                    self._cred_store.save_shared_credentials(shared_list)
+
+                self._stats["cred_syncs"] += 1
+                summary = self._cred_store.summary()
+                logger.info(
+                    f"Credentials synced: {summary['user_credential_count']} user, "
+                    f"{summary['shared_credential_count']} shared"
+                )
+            else:
+                logger.warning(f"Credential sync failed: {result.get('error')}")
+        except Exception as e:
+            logger.error(f"Credential sync error: {e}")
 
     # ── Health ────────────────────────────────────
 
@@ -337,10 +505,16 @@ class EdgeSyncDaemon:
         return dict(self._stats)
 
     def get_status(self) -> dict:
-        return {
+        status = {
             "running": self._running,
             "cloud_connected": self._client.health_check(),
             "offline_queue_size": self._offline_queue.size(),
             "cloud_url": self._client._base_url,
             "edge_id": self._client._edge_id,
         }
+        # v2.0: Add credential and WebSocket status
+        if self._cred_store:
+            status["credentials"] = self._cred_store.summary()
+        if self._ws_client:
+            status["websocket"] = self._ws_client.get_status()
+        return status

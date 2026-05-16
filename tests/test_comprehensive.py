@@ -1721,10 +1721,10 @@ check("EventBus query returns events", len(results) >= 3)
 
 # Subscribe
 received = []
-def test_handler(event):
+def _on_event(event):
     received.append(event.get("event_type", ""))
 
-eb.subscribe("error.*", test_handler)
+eb.subscribe("error.*", _on_event)
 check("EventBus subscribe", True)
 
 # Publish via new method

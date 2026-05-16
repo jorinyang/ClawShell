@@ -1,0 +1,127 @@
+{
+  "sidebar": {
+    "dashboard": "Dashboard",
+    "system": "System",
+    "nodes": "Nodes",
+    "users": "Users",
+    "credentials": "Credentials",
+    "endpoints": "Endpoints",
+    "audit": "Audit"
+  },
+  "topbar": {
+    "logout": "Logout",
+    "changePassword": "Change Password",
+    "profile": "Profile"
+  },
+  "login": {
+    "title": "ClawShell Admin",
+    "accountId": "Account ID",
+    "password": "Password",
+    "submit": "Sign In",
+    "error": "Login failed. Please check your credentials."
+  },
+  "changePassword": {
+    "title": "Change Password",
+    "oldPassword": "Current Password",
+    "newPassword": "New Password",
+    "confirmPassword": "Confirm Password",
+    "submit": "Change Password",
+    "success": "Password changed successfully",
+    "mismatch": "Passwords do not match"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "totalUsers": "Total Users",
+    "onlineNodes": "Online Nodes",
+    "todayEvents": "Today's Events",
+    "activeTasks": "Active Tasks",
+    "engineStatus": "Engine Status",
+    "systemResources": "System Resources",
+    "recentActivity": "Recent Activity"
+  },
+  "system": {
+    "title": "System Monitor",
+    "engines": "Engine Status",
+    "cpu": "CPU",
+    "memory": "Memory",
+    "disk": "Disk",
+    "network": "Network"
+  },
+  "nodes": {
+    "title": "Node Management",
+    "name": "Name",
+    "status": "Status",
+    "os": "OS",
+    "ip": "IP Address",
+    "lastHeartbeat": "Last Heartbeat",
+    "frameworks": "Frameworks",
+    "ideTools": "IDE Tools",
+    "actions": "Actions",
+    "enable": "Enable",
+    "disable": "Disable",
+    "remove": "Remove",
+    "online": "Online",
+    "offline": "Offline"
+  },
+  "users": {
+    "title": "User Management",
+    "accountId": "Account ID",
+    "displayName": "Display Name",
+    "role": "Role",
+    "status": "Status",
+    "lastLogin": "Last Login",
+    "actions": "Actions",
+    "addUser": "Add User",
+    "edit": "Edit",
+    "disable": "Disable",
+    "resetPassword": "Reset Password",
+    "coreAdmin": "Core Admin",
+    "admin": "Admin",
+    "user": "User"
+  },
+  "credentials": {
+    "title": "Credentials",
+    "myCredentials": "My Credentials",
+    "sharedCredentials": "Shared Credentials",
+    "service": "Service",
+    "type": "Type",
+    "name": "Name",
+    "value": "Value",
+    "description": "Description",
+    "actions": "Actions",
+    "add": "Add Credential",
+    "edit": "Edit",
+    "delete": "Delete"
+  },
+  "endpoints": {
+    "title": "Endpoint Configuration",
+    "internal": "Internal API Endpoints",
+    "external": "External Service Endpoints",
+    "name": "Name",
+    "url": "URL",
+    "status": "Status",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "rateLimit": "Rate Limit"
+  },
+  "audit": {
+    "title": "Audit Log",
+    "user": "User",
+    "action": "Action",
+    "target": "Target",
+    "ip": "IP Address",
+    "time": "Time",
+    "export": "Export CSV"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "delete": "Delete",
+    "search": "Search",
+    "loading": "Loading...",
+    "noData": "No data",
+    "success": "Success",
+    "error": "Error"
+  }
+}

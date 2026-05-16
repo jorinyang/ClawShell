@@ -241,14 +241,14 @@ try:
 
     # Track handler calls
     handler_calls = []
-    def test_handler(task):
+    def _scheduler_handler(task):
         handler_calls.append(task["task_id"])
 
-    scheduler.set_handler("test_handler", test_handler)
+    scheduler.set_handler("_scheduler_handler", _scheduler_handler)
 
     # Register a task
     tid = scheduler.register_task(
-        "test-task", "* * * * *", "Test task", "test_handler"
+        "test-task", "* * * * *", "Test task", "_scheduler_handler"
     )
     check("Register task", tid == "test-task")
 

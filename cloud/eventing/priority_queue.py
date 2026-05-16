@@ -63,6 +63,22 @@ class PriorityQueue:
         If the queue is full, drops the lowest-priority item.
         """
         with self._lock:
+            # Auto-extract priority from payload dict
+            if isinstance(payload, dict) and 'priority' in payload:
+                raw = payload['priority']
+                if isinstance(raw, str):
+                    try:
+                        extracted = Priority(raw.lower())
+                    except ValueError:
+                        extracted = priority
+                elif isinstance(raw, Priority):
+                    extracted = raw
+                else:
+                    extracted = priority
+                # Only override if caller used the default
+                if priority == Priority.MEDIUM:
+                    priority = extracted
+
             self._counter += 1
             self._total_enqueued += 1
 

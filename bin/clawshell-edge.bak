@@ -1,0 +1,127 @@
+#!/usr/bin/env python3
+"""
+ClawShell Edge Daemon — 本地端脑启动器
+用途: 启动MCP Bridge + Sync Daemon, 连接CloudHub云枢
+
+用法:
+  clawshell-edge start    启动全部服务
+  clawshell-edge status   查看状态
+  clawshell-edge stop     停止服务
+"""
+
+import sys
+import os
+import json
+import time
+import signal
+import subprocess
+from pathlib import Path
+
+EDGE_HOME = Path(os.environ.get("CLAWSHELL_EDGE_HOME", os.path.expanduser("~/.clawshell-edge")))
+CONFIG_PATH = EDGE_HOME / "config.json"
+CLAWSHELL_REPO = Path(os.environ.get("CLAWSHELL_REPO", os.path.expanduser("~/.clawshell")))
+PID_FILE = EDGE_HOME / "daemon.pid"
+LOG_FILE = EDGE_HOME / "edge.log"
+
+def load_config():
+    if CONFIG_PATH.exists():
+        with open(CONFIG_PATH) as f:
+            return json.load(f)
+    return {}
+
+def cmd_status():
+    config = load_config()
+    print(f"ClawShell Edge Status")
+    print(f"  Node: {config.get('node_name', 'unknown')} ({config.get('node_id', '?')})")
+    print(f"  Cloud: {config.get('cloud_url', 'not set')}")
+    print(f"  MCP Bridge: port {config.get('mcp_bridge_port', 17655)}")
+    
+    if PID_FILE.exists():
+        pid = PID_FILE.read_text().strip()
+        print(f"  Daemon PID: {pid}")
+    else:
+        print(f"  Daemon: not running")
+    
+    # Test cloud connection
+    import urllib.request
+    try:
+        url = f"{config.get('cloud_url', 'http://localhost:8000').rstrip('/')}/health"
+        resp = urllib.request.urlopen(url, timeout=5)
+        data = json.loads(resp.read().decode())
+        engines = data.get("engines", {})
+        active = sum(1 for v in engines.values() if v == "active")
+        print(f"  CloudHub: ONLINE ({active} engines active)")
+    except Exception as e:
+        print(f"  CloudHub: OFFLINE ({e})")
+
+def cmd_start():
+    config = load_config()
+    cloud_url = config.get("cloud_url", "http://47.239.71.174")
+    
+    print(f"Starting ClawShell Edge Brain...")
+    print(f"  Node: {config.get('node_name', 'edge')}")
+    print(f"  Cloud: {cloud_url}")
+    
+    # Start the MCP Bridge + Sync Daemon
+    os.chdir(CLAWSHELL_REPO)
+    
+    env = os.environ.copy()
+    env["CLAWSHELL_CLOUD_URL"] = cloud_url
+    env["CLAWSHELL_EDGE_CONFIG"] = str(CONFIG_PATH)
+    env["PYTHONPATH"] = str(CLAWSHELL_REPO)
+    
+    log_f = open(LOG_FILE, "a")
+    
+    proc = subprocess.Popen(
+        [sys.executable, "-c", """
+import asyncio, json, os, sys, time, signal
+sys.path.insert(0, os.environ.get('PYTHONPATH', '.'))
+
+async def main():
+    print(f"[Edge] ClawShell Edge Brain starting at {time.strftime('%Y-%m-%d %H:%M:%S')}")
+    
+    # Test cloud connection
+    cloud_url = os.environ.get('CLAWSHELL_CLOUD_URL', 'http://47.239.71.174')
+    print(f"[Edge] CloudHub: {cloud_url}")
+    
+    # Keep alive — sync loop
+    from edge.sync.daemon import EdgeSyncDaemon
+    config_path = os.environ.get('CLAWSHELL_EDGE_CONFIG', '')
+    daemon = EdgeSyncDaemon(cloud_url=cloud_url, config_path=config_path)
+    
+    try:
+        await daemon.start()
+    except KeyboardInterrupt:
+        print("[Edge] Shutting down...")
+    except Exception as e:
+        print(f"[Edge] Error: {e}")
+        import traceback
+        traceback.print_exc()
+
+asyncio.run(main())
+        """],
+        stdout=log_f,
+        stderr=subprocess.STDOUT,
+        env=env,
+    )
+    
+    PID_FILE.write_text(str(proc.pid))
+    print(f"  Daemon started (PID: {proc.pid})")
+    print(f"  Logs: {LOG_FILE}")
+    print(f"✓ ClawShell Edge is running")
+
+def cmd_stop():
+    if PID_FILE.exists():
+        pid = int(PID_FILE.read_text().strip())
+        try:
+            os.kill(pid, signal.SIGTERM)
+            print(f"✓ Stopped daemon (PID: {pid})")
+        except ProcessLookupError:
+            print("Daemon not running")
+        PID_FILE.unlink(missing_ok=True)
+    else:
+        print("No daemon running")
+
+if __name__ == "__main__":
+    cmd = sys.argv[1] if len(sys.argv) > 1 else "status"
+    {"status": cmd_status, "start": cmd_start, "stop": cmd_stop}.get(cmd, cmd_status)()

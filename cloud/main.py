@@ -1,6 +1,7 @@
 """Cloud Hub FastAPI server — 云枢主脑.
 
 Unified REST + WebSocket server providing all cloud engine endpoints.
+v2.0: Added auth/account management with SQLite database.
 """
 
 from __future__ import annotations
@@ -15,7 +16,7 @@ from shared.protocol import format_api_response
 
 logging.basicConfig(level=logging.INFO)
 
-# ── Global Engine References ──────────────────────
+# ── Global Engine References ──────────────────────────
 _eventbus = None
 _scheduler = None
 _capability_registry = None
@@ -36,13 +37,13 @@ def set_engines(**kwargs):
         globals()[f"_{name}"] = engine
 
 
-# ── App Factory ────────────────────────────────────
+# ── App Factory ────────────────────────────────────────
 
 def create_app() -> FastAPI:
     app = FastAPI(
         title="ClawShell Cloud Hub",
         description="一云多端云边协同分布式神经系统 — Cloud Hub API",
-        version="1.12",
+        version="2.0.0",
         docs_url="/docs" if config.debug else None,
         redoc_url=None,
     )
@@ -50,7 +51,7 @@ def create_app() -> FastAPI:
     app.add_middleware(AuthMiddleware)
     app.add_middleware(RateLimitMiddleware)
 
-    # v1.12.0: Expose engines via app.state for router access
+    # v2.0: Expose engines via app.state for router access
     app.state.eventbus = _eventbus
     app.state.scheduler = _scheduler
     app.state.capability_registry = _capability_registry
@@ -75,7 +76,7 @@ def create_app() -> FastAPI:
     async def health_check():
         return {
             "status": "healthy",
-            "version": "1.8",
+            "version": "2.0.0",
             "timestamp": time.time(),
             "engines": {
                 "eventbus": "active" if _eventbus else "inactive",
@@ -88,13 +89,13 @@ def create_app() -> FastAPI:
                 "review": "active" if _review else "inactive",
                 "broadcast": "active" if _broadcast else "inactive",
                 "n8n": "active" if _n8n_bridge else "inactive",
-                "insight": "active" if _insight else "inactive",  # v1.9.0
-                "brain": "active" if _brain else "inactive",  # v1.12.0
+                "insight": "active" if _insight else "inactive",
+                "brain": "active" if _brain else "inactive",
             },
             "edges_online": _swarm.online_count() if _swarm else 0,
         }
 
-    # Register routers
+    # ── v1.x Routers ─────────────────────────────────
     from cloud.routers.events import router as events_router
     from cloud.routers.nodes import router as nodes_router
     from cloud.routers.tasks import router as tasks_router
@@ -102,7 +103,7 @@ def create_app() -> FastAPI:
     from cloud.routers.insights_broadcasts_reviews import (
         insights_router, broadcasts_router, reviews_router, evolution_router
     )
-    from cloud.routers.brain import brain_router  # v1.12.0
+    from cloud.routers.brain import brain_router
 
     app.include_router(events_router, prefix="/api/v1")
     app.include_router(nodes_router, prefix="/api/v1")
@@ -112,12 +113,19 @@ def create_app() -> FastAPI:
     app.include_router(broadcasts_router, prefix="/api/v1")
     app.include_router(reviews_router, prefix="/api/v1")
     app.include_router(evolution_router, prefix="/api/v1")
-    app.include_router(brain_router, prefix="/api/v1")  # v1.12.0
+    app.include_router(brain_router, prefix="/api/v1")
+
+    # ── v2.0 Auth & Admin Routers ────────────────────
+    from cloud.routers.auth import router as auth_router
+    from cloud.routers.admin import router as admin_router
+
+    app.include_router(auth_router, prefix="/api/v2")
+    app.include_router(admin_router, prefix="/api/v2")
 
     return app
 
 
-# ── Startup ────────────────────────────────────────
+# ── Startup ────────────────────────────────────────────
 
 def init_engines():
     """Initialize all cloud engines."""
@@ -178,13 +186,21 @@ def init_engines():
     _brain = CloudAnalyst(eventbus=_eventbus, data_dir=config.data_dir)
     _brain.start()
 
-    logging.info(f"All 11 engines initialized (v1.12.0) — Brain LLM: {_brain._llm.is_configured}")
+    logging.info(f"All 12 engines initialized (v2.0) — Brain LLM: {_brain._llm.is_configured}")
+
+
+def init_auth_database():
+    """Initialize the v2.0 auth database (SQLite WAL)."""
+    from cloud.auth.database import init_database
+    init_database()
+    logging.info("Auth database initialized (v2.0)")
 
 
 def main():
     """Entry point: clawshell-cloud"""
     import uvicorn
 
+    init_auth_database()  # v2.0: init DB first
     init_engines()
     app = create_app()
 

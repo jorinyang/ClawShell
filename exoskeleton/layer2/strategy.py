@@ -47,18 +47,20 @@ class StrategySwitcher:
             initial: Starting strategy
         """
         self.current: str = initial
-        self.history: List[Tuple[str, float, str]] = []  # (strategy, timestamp, reason)
+        self.history: List[Tuple[str, str, float, str]] = []  # (old, new, timestamp, reason)
 
     def evaluate(
         self,
         health_score: float,
         resource_pressure: float,
+        auto_apply: bool = False,
     ) -> Optional[str]:
         """Evaluate whether strategy should change.
 
         Args:
             health_score: 0.0 (critical) to 1.0 (optimal)
             resource_pressure: 0.0 (idle) to 1.0 (maxed out)
+            auto_apply: If True, automatically call switch() when transition needed.
 
         Returns:
             New strategy if transition is needed, None otherwise.
@@ -84,6 +86,9 @@ class StrategySwitcher:
 
         # Validate transition
         if new != self.current and new in self.TRANSITIONS.get(self.current, []):
+            if auto_apply:
+                self.switch(new, f"auto: health={health_score:.2f} pressure={resource_pressure:.2f}")
+                return new
             return new
         return None
 
@@ -96,7 +101,7 @@ class StrategySwitcher:
         """
         old = self.current
         self.current = new_strategy
-        self.history.append((new_strategy, time.time(), reason))
+        self.history.append((old, new_strategy, time.time(), reason))
 
     def can_transition_to(self, target: str) -> bool:
         """Check if transitioning to target is valid."""
@@ -105,8 +110,8 @@ class StrategySwitcher:
     def get_recent_history(self, limit: int = 10) -> List[dict]:
         """Get recent strategy transitions."""
         return [
-            {"strategy": s, "timestamp": ts, "reason": r}
-            for s, ts, r in self.history[-limit:]
+            {"old_strategy": o, "strategy": s, "timestamp": ts, "reason": r}
+            for o, s, ts, r in self.history[-limit:]
         ]
 
     @property
