@@ -208,6 +208,7 @@ class CloudEventBus:
             return {
                 "total_events": len(self._events),
                 "total_hashes": len(self._hashes),
+                "deduplicated": len(self._hashes),
                 "by_type": dict(self._stats),
                 "unique_types": len(self._by_type),
                 "unique_sources": len(self._by_source),

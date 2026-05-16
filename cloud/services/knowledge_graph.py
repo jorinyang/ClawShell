@@ -327,9 +327,16 @@ class KnowledgeGraph:
     # ── Internal Helpers ────────────────────────────
 
     def _tokenize(self, text: str) -> List[str]:
-        """Simple tokenizer."""
-        return [t.lower().strip(".,!?;:()[]\"'") for t in text.split()
-                if len(t.strip(".,!?;:()[]\"'")) > 1]
+        """Tokenizer with prefix expansion for fuzzy search."""
+        tokens = []
+        for t in text.split():
+            clean = t.lower().strip(".,!?;:()[]\"'")
+            if len(clean) > 1:
+                tokens.append(clean)
+                # Add prefixes for substring matching
+                for i in range(2, min(len(clean) + 1, 8)):
+                    tokens.append(clean[:i])
+        return tokens
 
     def _idf(self, term: str, N: int) -> float:
         """Inverse document frequency."""
