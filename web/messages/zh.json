@@ -126,7 +126,8 @@
     "address": "地址",
     "port": "端口",
     "protocol": "协议",
-    "update": "更新端点"
+    "update": "更新端点",
+    "enabled": "启用"
   },
   "audit": {
     "title": "审计日志",

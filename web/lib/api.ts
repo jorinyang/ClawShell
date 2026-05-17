@@ -125,9 +125,10 @@ export const api = {
   },
 
   // Endpoints
-  getEndpoints: () => request<any[]>("/admin/endpoints"),
+  getEndpoints: () =>
+    request<{ endpoints: Record<string, { enabled: boolean; config: any }> }>("/admin/endpoints"),
 
-  updateEndpoint: (id: string, data: any) =>
+  updateEndpoint: (id: string, data: { enabled?: boolean; config?: any }) =>
     request<any>(`/admin/endpoints/${id}`, { method: "PUT", body: JSON.stringify(data) }),
 
   // My Credentials

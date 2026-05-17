@@ -126,7 +126,8 @@
     "address": "Address",
     "port": "Port",
     "protocol": "Protocol",
-    "update": "Update Endpoint"
+    "update": "Update Endpoint",
+    "enabled": "Enabled"
   },
   "audit": {
     "title": "Audit Logs",
