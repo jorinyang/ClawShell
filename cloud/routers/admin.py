@@ -210,7 +210,7 @@ async def update_node(node_id: str, data: NodeUpdate, request: Request):
             raise HTTPException(status_code=404, detail="Node not found")
         updates = []
         params = []
-        for field in ("node_name", "node_type", "status", "ip_address", "metadata"):
+        for field in ("node_name", "node_type", "status", "ip_address", "metadata", "frameworks", "ide_tools"):
             val = getattr(data, field, None)
             if val is not None:
                 updates.append(f"{field} = ?")

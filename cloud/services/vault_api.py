@@ -20,19 +20,37 @@ from typing import Dict, List, Optional
 
 
 class VaultAPI:
-    """Obsidian vault CRUD + OSS sync API."""
+    """Obsidian vault CRUD + OSS sync API.
+
+    Supports per-user data isolation via user_id. When user_id is set,
+    personal vault operations are scoped to oss://{bucket}/vault/{user_id}/.
+    Shared vault operations use oss://{bucket}/vault/shared/.
+    """
 
     def __init__(self, vault_path: str = "", oss_bucket: str = "",
                  oss_endpoint: str = "", oss_key_id: str = "",
-                 oss_key_secret: str = ""):
+                 oss_key_secret: str = "", user_id: str = ""):
         self._vault_path = vault_path or os.environ.get("CLAWSHELL_VAULT_PATH", "")
         self._oss_bucket = oss_bucket or os.environ.get("CLAWSHELL_OSS_BUCKET", "clawshell-vault")
         self._oss_endpoint = oss_endpoint or os.environ.get("CLAWSHELL_OSS_ENDPOINT", "")
         self._oss_key_id = oss_key_id or os.environ.get("CLAWSHELL_ALIYUN_AK_ID", "")
         self._oss_key_secret = oss_key_secret or os.environ.get("CLAWSHELL_ALIYUN_AK_SECRET", "")
+        self._user_id = user_id
 
         self._last_sync = 0.0
         self._sync_log: List[dict] = []
+
+    @property
+    def _oss_personal_prefix(self) -> str:
+        """OSS prefix for personal (user-scoped) vault."""
+        if self._user_id:
+            return f"oss://{self._oss_bucket}/vault/{self._user_id}/"
+        return f"oss://{self._oss_bucket}/vault/"
+
+    @property
+    def _oss_shared_prefix(self) -> str:
+        """OSS prefix for shared vault (accessible by all users)."""
+        return f"oss://{self._oss_bucket}/vault/shared/"
 
     # ── Status ─────────────────────────────────────
 
@@ -159,28 +177,51 @@ class VaultAPI:
     # ── OSS Sync ───────────────────────────────────
 
     def sync_push(self) -> dict:
-        """Push local vault to OSS."""
+        """Push local vault to OSS (user-scoped)."""
         if not self._oss_key_id:
             return {"status": "skipped", "reason": "OSS not configured"}
 
         result = self._run_ossutil("sync", self._vault_path,
-                                   f"oss://{self._oss_bucket}/vault/",
+                                   self._oss_personal_prefix,
                                    "--update")
         self._last_sync = time.time()
         self._log_sync("push", result)
         return result
 
     def sync_pull(self) -> dict:
-        """Pull OSS vault to local."""
+        """Pull OSS vault to local (user-scoped)."""
         if not self._oss_key_id:
             return {"status": "skipped", "reason": "OSS not configured"}
 
         result = self._run_ossutil("sync",
-                                   f"oss://{self._oss_bucket}/vault/",
+                                   self._oss_personal_prefix,
                                    self._vault_path,
                                    "--update")
         self._last_sync = time.time()
         self._log_sync("pull", result)
+        return result
+
+    def sync_push_shared(self, local_shared_path: str) -> dict:
+        """Push shared vault to OSS (accessible by all users)."""
+        if not self._oss_key_id:
+            return {"status": "skipped", "reason": "OSS not configured"}
+
+        result = self._run_ossutil("sync", local_shared_path,
+                                   self._oss_shared_prefix,
+                                   "--update")
+        self._log_sync("push_shared", result)
+        return result
+
+    def sync_pull_shared(self, local_shared_path: str) -> dict:
+        """Pull shared vault from OSS (accessible by all users)."""
+        if not self._oss_key_id:
+            return {"status": "skipped", "reason": "OSS not configured"}
+
+        result = self._run_ossutil("sync",
+                                   self._oss_shared_prefix,
+                                   local_shared_path,
+                                   "--update")
+        self._log_sync("pull_shared", result)
         return result
 
     # ── Internal ──────────────────────────────────

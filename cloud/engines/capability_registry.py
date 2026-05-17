@@ -72,8 +72,13 @@ class CapabilityRegistry:
             self._save()
             return node_id
 
-    def heartbeat(self, node_id: str, metrics: Optional[dict] = None) -> bool:
-        """Record a heartbeat. Returns True if node exists."""
+    def heartbeat(self, node_id: str, metrics: Optional[dict] = None,
+                   frameworks: Optional[list] = None,
+                   ide_tools: Optional[list] = None) -> bool:
+        """Record a heartbeat. Returns True if node exists.
+
+        Also updates frameworks and ide_tools if provided in the heartbeat.
+        """
         with self._lock:
             node = self._nodes.get(node_id)
             if not node:
@@ -101,6 +106,20 @@ class CapabilityRegistry:
                 trust_score = self._trust_evaluator.record_metrics(node_id, trust_metrics)
                 node["trust_score"] = trust_score.score
                 node["trust_level"] = trust_score.level.name
+
+            # Update frameworks if provided
+            if frameworks is not None:
+                if frameworks and isinstance(frameworks[0], dict):
+                    # Framework objects (to_dict format) — store as list of names + full info
+                    node["frameworks"] = [f.get("name", str(f)) for f in frameworks if isinstance(f, dict)]
+                    node["framework_details"] = frameworks
+                else:
+                    # Simple list of framework names
+                    node["frameworks"] = frameworks
+
+            # Update IDE tools if provided
+            if ide_tools is not None:
+                node["ide_tools"] = ide_tools
 
             self._save()
             return True

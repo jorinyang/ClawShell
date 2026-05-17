@@ -62,6 +62,25 @@ def db_ctx() -> DatabaseContext:
     return DatabaseContext()
 
 
+def _migrate(conn: sqlite3.Connection):
+    """Run incremental migrations on existing tables."""
+    # Check if cred_type column exists in credentials table
+    cursor = conn.execute("PRAGMA table_info(credentials)")
+    columns = [row["name"] for row in cursor.fetchall()]
+
+    if "cred_type" not in columns:
+        logger.info("Migrating: adding cred_type column to credentials")
+        conn.execute("ALTER TABLE credentials ADD COLUMN cred_type TEXT NOT NULL DEFAULT 'legacy'")
+
+    # Check if cred_type column exists in shared_credentials table
+    cursor = conn.execute("PRAGMA table_info(shared_credentials)")
+    sc_columns = [row["name"] for row in cursor.fetchall()]
+
+    if "cred_type" not in sc_columns:
+        logger.info("Migrating: adding cred_type column to shared_credentials")
+        conn.execute("ALTER TABLE shared_credentials ADD COLUMN cred_type TEXT NOT NULL DEFAULT 'legacy'")
+
+
 def init_database():
     """Create all tables if they don't exist, insert default admin."""
     with db_ctx() as conn:
@@ -84,6 +103,7 @@ def init_database():
                 service     TEXT NOT NULL,
                 cred_key    TEXT NOT NULL,
                 cred_value_enc TEXT NOT NULL,
+                cred_type   TEXT NOT NULL DEFAULT 'legacy',
                 description TEXT DEFAULT '',
                 created_at  TEXT NOT NULL DEFAULT (datetime('now')),
                 updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
@@ -95,6 +115,7 @@ def init_database():
                 service     TEXT NOT NULL,
                 cred_key    TEXT NOT NULL,
                 cred_value_enc TEXT NOT NULL,
+                cred_type   TEXT NOT NULL DEFAULT 'legacy',
                 description TEXT DEFAULT '',
                 created_by  TEXT NOT NULL,
                 created_at  TEXT NOT NULL DEFAULT (datetime('now')),
@@ -109,6 +130,8 @@ def init_database():
                 status      TEXT DEFAULT 'offline',
                 ip_address  TEXT DEFAULT '',
                 metadata    TEXT DEFAULT '{}',
+                frameworks  TEXT DEFAULT '[]',
+                ide_tools   TEXT DEFAULT '[]',
                 last_seen   TEXT DEFAULT (datetime('now')),
                 created_at  TEXT NOT NULL DEFAULT (datetime('now'))
             );
@@ -137,12 +160,28 @@ def init_database():
 
             CREATE INDEX IF NOT EXISTS idx_cred_user ON credentials(user_id);
             CREATE INDEX IF NOT EXISTS idx_cred_service ON credentials(service);
+            CREATE INDEX IF NOT EXISTS idx_cred_type ON credentials(cred_type);
             CREATE INDEX IF NOT EXISTS idx_shared_cred_service ON shared_credentials(service);
             CREATE INDEX IF NOT EXISTS idx_session_user ON sessions(user_id);
             CREATE INDEX IF NOT EXISTS idx_session_active ON sessions(is_active);
             CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_logs(user_id);
             CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_logs(timestamp);
         """)
+
+        # Migration: add frameworks/ide_tools columns to edge_nodes if missing
+        try:
+            conn.execute("SELECT frameworks FROM edge_nodes LIMIT 1")
+        except sqlite3.OperationalError:
+            conn.execute("ALTER TABLE edge_nodes ADD COLUMN frameworks TEXT DEFAULT '[]'")
+            logger.info("Migrated edge_nodes: added frameworks column")
+        try:
+            conn.execute("SELECT ide_tools FROM edge_nodes LIMIT 1")
+        except sqlite3.OperationalError:
+            conn.execute("ALTER TABLE edge_nodes ADD COLUMN ide_tools TEXT DEFAULT '[]'")
+            logger.info("Migrated edge_nodes: added ide_tools column")
+
+        # Run incremental migrations for existing DBs
+        _migrate(conn)
 
         # Insert default core_admin if not exists
         existing = conn.execute(

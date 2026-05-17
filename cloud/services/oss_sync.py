@@ -15,17 +15,30 @@ from typing import Dict, List, Optional, Callable
 
 
 class OSSVaultSync:
-    """Bidirectional sync engine for Obsidian vault ↔ OSS."""
+    """Bidirectional sync engine for Obsidian vault ↔ OSS.
+
+    Supports per-user data isolation via user_id prefix in OSS paths.
+    - Personal vault: oss://{bucket}/vault/{user_id}/
+    - Shared vault:   oss://{bucket}/vault/shared/  (accessible by all users)
+    """
 
     def __init__(self, vault_path: str, oss_bucket: str,
                  oss_endpoint: str = "", oss_key_id: str = "",
-                 oss_key_secret: str = ""):
+                 oss_key_secret: str = "", user_id: str = ""):
         self._vault_path = vault_path
         self._oss_bucket = oss_bucket
         self._oss_endpoint = oss_endpoint
         self._oss_key_id = oss_key_id or os.environ.get("CLAWSHELL_ALIYUN_AK_ID", "")
         self._oss_key_secret = oss_key_secret or os.environ.get("CLAWSHELL_ALIYUN_AK_SECRET", "")
-        self._oss_prefix = f"oss://{self._oss_bucket}/vault/"
+        self._user_id = user_id
+
+        # Per-user isolation: personal vault scoped to user_id
+        if user_id:
+            self._oss_prefix = f"oss://{self._oss_bucket}/vault/{user_id}/"
+        else:
+            self._oss_prefix = f"oss://{self._oss_bucket}/vault/"
+        # Shared vault prefix (accessible by all users)
+        self._shared_oss_prefix = f"oss://{self._oss_bucket}/vault/shared/"
 
         self._lock = threading.RLock()
         self._file_hashes: Dict[str, str] = {}
@@ -43,6 +56,16 @@ class OSSVaultSync:
     def pull(self, dry_run: bool = False) -> dict:
         """Pull remote changes from OSS."""
         return self._run_sync("pull", self._oss_prefix, self._vault_path, dry_run)
+
+    def push_shared(self, local_shared_path: str, dry_run: bool = False) -> dict:
+        """Push shared vault to OSS (accessible by all users)."""
+        return self._run_sync("push_shared", local_shared_path,
+                              self._shared_oss_prefix, dry_run)
+
+    def pull_shared(self, local_shared_path: str, dry_run: bool = False) -> dict:
+        """Pull shared vault from OSS (accessible by all users)."""
+        return self._run_sync("pull_shared", self._shared_oss_prefix,
+                              local_shared_path, dry_run)
 
     def sync(self, dry_run: bool = False) -> dict:
         """Bidirectional sync (push then pull)."""

@@ -210,6 +210,83 @@ class LocalCredentialStore:
                         return None
         return None
 
+    def get_credential_by_service_key(self, service: str, cred_key: str) -> Optional[dict]:
+        """Get a credential by service and cred_key. Returns decrypted value dict."""
+        _, decrypt_value = _get_encryption()
+        with self._lock:
+            for cred in self.load_credentials():
+                if cred.get("service") == service and cred.get("cred_key") == cred_key:
+                    result = dict(cred)
+                    try:
+                        result["decrypted_value"] = decrypt_value(cred["cred_value_enc"])
+                    except Exception:
+                        result["decrypted_value"] = None
+                    return result
+        return None
+
+    # ── Memos Cloud Configuration ────────────────────────
+
+    def save_memos_cloud_config(self, user_id: str, api_url: str, api_key: str):
+        """Store Memos Cloud configuration as a credential of type 'memos_cloud'.
+
+        Fields: user_id (Memos user ID matching ClawShell user_id),
+                api_url (Memos Cloud API endpoint), api_key (Memos API key).
+        """
+        encrypt_value, _ = _get_encryption()
+        import secrets
+        cred_id = f"mc_{secrets.token_hex(8)}"
+        config_json = json.dumps({
+            "user_id": user_id,
+            "api_url": api_url,
+            "api_key": api_key,
+        })
+        enc_value = encrypt_value(config_json)
+
+        with self._lock:
+            service_dir = os.path.join(self._creds_dir, "memos_cloud")
+            os.makedirs(service_dir, exist_ok=True)
+
+            entry = {
+                "cred_id": cred_id,
+                "service": "memos_cloud",
+                "cred_key": f"memos_cloud_{user_id}",
+                "cred_value_enc": enc_value,
+                "description": f"Memos Cloud config for user {user_id}",
+                "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                "updated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                "synced_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            }
+
+            filepath = os.path.join(service_dir, f"{cred_id}.json")
+            with open(filepath, "w") as f:
+                json.dump(entry, f, indent=2)
+
+            logger.info(f"Saved Memos Cloud config for user {user_id}")
+
+    def get_memos_cloud_config(self, user_id: str) -> Optional[dict]:
+        """Retrieve Memos Cloud configuration for a given user_id.
+
+        Returns dict with: user_id, api_url, api_key or None if not found.
+        """
+        _, decrypt_value = _get_encryption()
+        with self._lock:
+            service_dir = os.path.join(self._creds_dir, "memos_cloud")
+            if not os.path.isdir(service_dir):
+                return None
+            for filename in os.listdir(service_dir):
+                if not filename.endswith(".json"):
+                    continue
+                filepath = os.path.join(service_dir, filename)
+                try:
+                    with open(filepath) as f:
+                        entry = json.load(f)
+                    if entry.get("cred_key") == f"memos_cloud_{user_id}":
+                        config_json = decrypt_value(entry["cred_value_enc"])
+                        return json.loads(config_json)
+                except Exception as e:
+                    logger.warning(f"Failed to load Memos config from {filepath}: {e}")
+        return None
+
     # ── Merge (server wins by updated_at) ───────────────
 
     def merge_and_save(self, server_creds: List[dict]):

@@ -453,7 +453,12 @@ class EdgeSyncDaemon:
             logger.warning("Token refresh failed")
 
     def _sync_credentials(self):
-        """Sync credentials from cloud to local store."""
+        """Sync credentials from cloud to local store.
+
+        Also syncs Memos Cloud user_id mapping when 'memos_cloud' credentials
+        are received. The Memos config is stored as a credential of type
+        'memos_cloud' with fields: user_id, api_url, api_key.
+        """
         if not self._cred_store:
             return
 
@@ -473,6 +478,8 @@ class EdgeSyncDaemon:
 
                 if user_list:
                     self._cred_store.merge_and_save(user_list)
+                    # Sync Memos Cloud user_id mapping from credentials
+                    self._sync_memos_cloud_config(user_list)
                 if shared_list:
                     self._cred_store.save_shared_credentials(shared_list)
 
@@ -487,10 +494,59 @@ class EdgeSyncDaemon:
         except Exception as e:
             logger.error(f"Credential sync error: {e}")
 
+    def _sync_memos_cloud_config(self, cred_list: List[dict]):
+        """Extract and store Memos Cloud config from synced credentials.
+
+        Looks for credentials with service='memos_cloud' and stores the
+        user_id mapping locally so the edge knows which Memos user_id
+        maps to which ClawShell user_id.
+        """
+        for cred in cred_list:
+            if cred.get("service") != "memos_cloud":
+                continue
+            try:
+                plain_value = cred.get("cred_value", "")
+                if not plain_value:
+                    # Try to get from cred_value_enc (already stored)
+                    continue
+                config = json.loads(plain_value) if isinstance(plain_value, str) else plain_value
+                user_id = config.get("user_id", "")
+                api_url = config.get("api_url", "")
+                api_key = config.get("api_key", "")
+                if user_id and api_url:
+                    self._cred_store.save_memos_cloud_config(user_id, api_url, api_key)
+                    logger.info(f"Memos Cloud config synced for user {user_id}")
+            except (json.JSONDecodeError, TypeError) as e:
+                logger.warning(f"Failed to parse Memos Cloud credential: {e}")
+
     # ── Health ────────────────────────────────────
 
     def _report_health(self):
-        """Report edge health to Cloud."""
+        """Report edge health to Cloud.
+
+        Includes detected frameworks and IDE tools in the health report
+        so the cloud can track which frameworks/IDEs each edge node has.
+        """
+        # Detect frameworks and IDEs
+        frameworks = []
+        ide_tools = []
+        try:
+            from edge.detector import detect_all_frameworks
+            detected = detect_all_frameworks()
+            frameworks = [f.to_dict() for f in detected]
+        except ImportError:
+            pass
+        except Exception:
+            pass
+
+        try:
+            from edge.ide_bridge import detect_ide_tools
+            ide_tools = detect_ide_tools()
+        except ImportError:
+            pass
+        except Exception:
+            pass
+
         try:
             import psutil
             health = {
@@ -500,6 +556,8 @@ class EdgeSyncDaemon:
                     "memory_percent": psutil.virtual_memory().percent,
                     "disk_percent": psutil.disk_usage("/").percent,
                 },
+                "frameworks": frameworks,
+                "ide_tools": ide_tools,
                 "services": {},
                 "uptime_seconds": time.time(),
             }
@@ -507,6 +565,8 @@ class EdgeSyncDaemon:
             health = {
                 "node_id": self._client._edge_id,
                 "metrics": {"cpu_percent": 0, "memory_percent": 0, "disk_percent": 0},
+                "frameworks": frameworks,
+                "ide_tools": ide_tools,
             }
 
         self._client.report_health(health)

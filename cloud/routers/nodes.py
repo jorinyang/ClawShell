@@ -130,7 +130,11 @@ async def deregister_node(node_id: str):
 
 @router.post("/health/report")
 async def health_report(request: Request):
-    """Edge health report."""
+    """Edge health report.
+
+    Accepts frameworks and ide_tools in the payload so the cloud can
+    track which frameworks and IDE tools each edge node has.
+    """
     try:
         body = await request.json()
     except Exception:
@@ -140,13 +144,17 @@ async def health_report(request: Request):
     registry = _get_registry()
 
     metrics = body.get("metrics", {})
-    ok = registry.heartbeat(node_id, metrics)
+    frameworks = body.get("frameworks", None)
+    ide_tools = body.get("ide_tools", None)
+    ok = registry.heartbeat(node_id, metrics, frameworks=frameworks, ide_tools=ide_tools)
 
     if not ok:
         # Auto-register if not yet registered
         registry.register({
             "node_id": node_id,
             "metrics": metrics,
+            "frameworks": frameworks or [],
+            "ide_tools": ide_tools or [],
         })
 
     return format_api_response(True, data={"node_id": node_id, "status": "reported"})
