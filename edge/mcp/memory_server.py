@@ -70,31 +70,39 @@ def _publish_memory_event(category: str, content_preview: str, source: str = "me
 
 
 def search_mempalace(query: str, limit: int = 10) -> List[dict]:
-    """Search MemPalace knowledge graph + ChromaDB."""
-    results = []
-    db_path = MEMPALACE_PATH / "knowledge_graph.sqlite3"
-    if db_path.exists():
-        try:
-            conn = sqlite3.connect(str(db_path))
-            # Try entities table
+    """Search MemPalace with hybrid BM25 + Vector ranking (v2.1.1).
+
+    Uses mempalace_bridge for CJK-aware hybrid search when available,
+    falls back to SQLite LIKE search otherwise.
+    """
+    try:
+        from .mempalace_bridge import search_hybrid
+        return search_hybrid(query, limit=limit)
+    except ImportError:
+        # Fallback: direct SQLite search
+        results = []
+        db_path = MEMPALACE_PATH / "knowledge_graph.sqlite3"
+        if db_path.exists():
             try:
-                rows = conn.execute(
-                    "SELECT name, type, properties FROM entities WHERE name LIKE ? OR properties LIKE ? LIMIT ?",
-                    (f"%{query}%", f"%{query}%", limit)
-                ).fetchall()
-                for name, etype, props in rows:
-                    results.append({
-                        "source": "mempalace",
-                        "key": name,
-                        "type": etype,
-                        "content": str(props)[:300],
-                    })
+                conn = sqlite3.connect(str(db_path))
+                try:
+                    rows = conn.execute(
+                        "SELECT name, type, properties FROM entities WHERE name LIKE ? OR properties LIKE ? LIMIT ?",
+                        (f"%{query}%", f"%{query}%", limit),
+                    ).fetchall()
+                    for name, etype, props in rows:
+                        results.append({
+                            "source": "mempalace",
+                            "key": name,
+                            "type": etype,
+                            "content": str(props)[:300],
+                        })
+                except Exception:
+                    pass
+                conn.close()
             except Exception:
                 pass
-            conn.close()
-        except Exception:
-            pass
-    return results
+        return results
 
 
 def search_memos_cloud(query: str, limit: int = 10) -> List[dict]:
@@ -226,15 +234,22 @@ def tool_memory_store(args: dict) -> dict:
 def tool_memory_stats(args: dict) -> dict:
     stats = {"mempalace": {}, "memos_cloud": "unknown", "memos_local": "unknown"}
 
-    db_path = MEMPALACE_PATH / "knowledge_graph.sqlite3"
-    if db_path.exists():
-        try:
-            conn = sqlite3.connect(str(db_path))
-            count = conn.execute("SELECT COUNT(*) FROM entities").fetchone()[0]
-            conn.close()
-            stats["mempalace"] = {"entries": count, "path": str(db_path)}
-        except Exception:
-            stats["mempalace"] = {"error": "read failed"}
+    # v2.1.1: Use bridge for detailed MemPalace stats
+    try:
+        from .mempalace_bridge import get_stats as bridge_stats
+        mp_stats = bridge_stats()
+        stats["mempalace"] = mp_stats
+    except ImportError:
+        # Fallback: direct SQLite check
+        db_path = MEMPALACE_PATH / "knowledge_graph.sqlite3"
+        if db_path.exists():
+            try:
+                conn = sqlite3.connect(str(db_path))
+                count = conn.execute("SELECT COUNT(*) FROM entities").fetchone()[0]
+                conn.close()
+                stats["mempalace"] = {"entries": count, "path": str(db_path), "engine": "sqlite_like"}
+            except Exception:
+                stats["mempalace"] = {"error": "read failed"}
 
     try:
         r = http.get(f"{MEMOS_LOCAL_URL}/health", timeout=5)
@@ -316,7 +331,7 @@ def handle_request(msg: dict) -> Optional[dict]:
                 "result": {
                     "protocolVersion": "2024-11-05",
                     "capabilities": {"tools": {}},
-                    "serverInfo": {"name": "clawshell-memory", "version": "1.12.0"},
+                    "serverInfo": {"name": "clawshell-memory", "version": "2.1.1"},
                 },
             }
         elif method == "notifications/initialized":
@@ -342,7 +357,7 @@ def handle_request(msg: dict) -> Optional[dict]:
 
 
 def main():
-    sys.stderr.write("[clawshell-memory-mcp] Starting v1.12.0\n")
+    sys.stderr.write("[clawshell-memory-mcp] Starting v2.1.1\n")
     sys.stderr.flush()
     buffer = ""
     for line in sys.stdin:
