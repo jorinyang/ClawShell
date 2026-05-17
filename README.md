@@ -1,171 +1,171 @@
-# ClawShell 2.0
+# ClawShell 2.0 — 多账户云边协同管理平台
 
-> **一云多端云边协同分布式神经系统**
+> **一云多端云边协同分布式神经系统** | Multi-Account · Cloud Dashboard · Credential Sync
 >
-> Version 1.2.0 | Cloud Hub (云枢) + Edge Brain (端脑) | Engineering Cybernetics | 智询工作室
+> Version 2.0.0 | CloudHub (云枢) + Edge Brain (端脑) + Dashboard (控制台) | Engineering Cybernetics | 智询工作室
 
 ---
 
 ## 架构全景
 
 ```
-┌──────────────────────────────────────────────────────────────────────────────┐
-│            ClawShell 2.0 — 一云多端云边协同分布式神经系统                      │
-│     Version 1.2.0 | Cloud Hub + Edge Brain | Engineering Cybernetics        │
-└──────────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│              ClawShell 2.0 — 多账户云边协同管理平台                                    │
+│    CloudHub + Edge Brain + Dashboard | Engineering Cybernetics                       │
+└─────────────────────────────────────────────────────────────────────────────────────┘
 
-┌───────────────────────────────┐  ┌───────────────────────────────────────────┐
-│   ☁️ CLOUD HUB (云枢)         │  │   🖥️ EDGE BRAIN (端脑)                    │
-│   Alibaba Cloud ECS           │  │   User Terminal                           │
-│                               │  │                                           │
-│ ┌─ API Gateway :8000 ───────┐ │  │ ┌─ L4 多Agent集群 ────────────────────┐  │
-│ │ REST /api/v1/* (14 ep)    │ │  │ │ SwarmManager+Discovery              │  │
-│ │ WebSocket /ws/events      │ │  │ │ TrustEvaluator+Manager              │  │
-│ │ MCP WSS /mcp/ws :8443     │ │↕ │ │ EcologyMatcher·CollaborationProtocol│  │
-│ │ Auth(JWT+Token+RateLimit) │ │D │ └────────────────────────────────────┘  │
-│ └────────────────────────────┘ │A │                                           │
-│                               │T │ ┌─ L3 自组织 ─────────────────────────┐  │
-│ ┌─ 12 Core Engines ─────────┐ │A │ │ EdgeEventBus(Condition+DLQ+Tracer)  │  │
-│ │ EventBus · TaskBoard      │ │  │ │ TaskOrganizer(DAG)·ContextManager   │  │
-│ │ SkillMarket · CapRegistry │ │F │ │ N8N Workflow                        │  │
-│ │ SwarmCoord · CronSched    │ │L │ └────────────────────────────────────┘  │
-│ │ Evolution · ReviewEngine  │ │O │                                           │
-│ │ Broadcast · N8NBridge     │ │W │ ┌─ L2 自适应 ─────────────────────────┐  │
-│ │ 🆕 Workflow · 🆕 Optimizer│ │  │ │ SelfRepair(Backup+Checkpoint)        │  │
-│ │ 🆕 DeepThinkEngine        │ │  │ │ FeedbackControlLoop·AdaptiveTuner   │  │
-│ └────────────────────────────┘ │  │ │ Strategy·AdaptiveController          │  │
-│                               │  │ └────────────────────────────────────┘  │
-│ ┌─ 🆕 Event Sourcing (9) ───┐ │  │                                           │
-│ │ Store·Tracer·DeadLetterQ  │ │  │ ┌─ L1 自感知 ─────────────────────────┐  │
-│ │ PriorityQ·Aggregator      │ │  │ │ System·Disk·Process·Network          │  │
-│ │ Metrics·PatternMiner      │ │  │ │ Service·Agent·Gateway                │  │
-│ │ MLEngine·QualityEvaluator │ │  │ │ HealthChecker(27 items)              │  │
-│ └────────────────────────────┘ │  │ └────────────────────────────────────┘  │
-│                               │  │                                           │
-│ ┌─ 🆕 MCP Protocol Layer ───┐ │  │ ┌─ 🆕 Edge Gateway ───────────────────┐  │
-│ │ MCPHub·JWT Auth            │ │  │ │ NetworkDiscovery·DeviceMonitor       │  │
-│ │ 7-Domain Router            │ │  │ │ KnowledgePuller·SelfHealing          │  │
-│ └────────────────────────────┘ │  │ └────────────────────────────────────┘  │
-│                               │  │                                           │
-│ ┌─ Cloud Services ──────────┐ │  │ ┌─ Core Components ───────────────────┐  │
-│ │ VaultAPI·OSS Sync·MemOS   │ │  │ │ EnvDetector (8 frameworks)           │  │
-│ │ 🆕 KnowledgeGraph          │ │  │ │ IDEBridge (6 CLI agents)             │  │
-│ └────────────────────────────┘ │  │ │ Ecosystem Installer (10 comp)        │  │
-│                               │  │ │ ConfigWizard·Edge CLI                │  │
-│ ┌─ Deployment ──────────────┐ │  │ │ SyncDaemon(5s)·SyncEngine(Delta)     │  │
-│ │ Terraform·Docker·install  │ │  │ │ AdapterManager                       │  │
-│ └────────────────────────────┘ │  │ └────────────────────────────────────┘  │
-└───────────────────────────────┘  │                                           │
-                                    │ Frameworks: Hermes·OpenClaw·Wukong       │
-                                    │ QClaw·CoPaw·HiClaw·EasyClaw·WorkBuddy    │
-                                    │ IDEs: Codex·Claude·Kimi·DeepSeek·Copilot │
-                                    │ Eco: psutil·ws·chromadb·MemPalace·N8N    │
-                                    │ MemOS·Watchdog·BrowserRT·ONNX·Obsidian   │
-                                    └───────────────────────────────────────────┘
+┌──────────────────────────────┐  ┌──────────────────────────────────────┐  ┌──────────────────────┐
+│  ☁️ CLOUDHUB (云枢)           │  │  🖥️ EDGE BRAIN (端脑)                │  │  📊 DASHBOARD (控制台)│
+│  Alibaba Cloud ECS            │  │  User Terminal                       │  │  Next.js 16           │
+│                               │  │                                      │  │                       │
+│  ┌─ API Gateway :8000 ─────┐ │  │  ┌─ L4 多Agent集群 ─────────────┐  │  │  ┌─ Features ───────┐ │
+│  │ REST /api/v1/* (76 ep)  │ │  │  │ SwarmManager + Discovery     │  │  │  │ 多账户管理       │ │
+│  │ WebSocket /ws/events    │ │  │  │ TrustEvaluator + Manager     │  │  │  │ 节点拓扑图       │ │
+│  │ MCP WSS /mcp/ws :8443   │ │↕ │  │ EcologyMatcher               │  │  │  │ 凭证管理         │ │
+│  │ Auth(JWT+RBAC+RateLimit)│ │D │  └──────────────────────────────┘  │  │  │ 审计日志         │ │
+│  └─────────────────────────┘ │A │                                      │  │  │ 中/English       │ │
+│                               │T │  ┌─ L3 自组织 ─────────────────┐  │  │  └──────────────────┘ │
+│  ┌─ 15 Core Engines ───────┐ │A │  │ EdgeEventBus(Cond+DLQ+Trace)│  │  │                       │
+│  │ EventBus · TaskBoard     │ │  │  │ TaskOrganizer(DAG)          │  │  │  HTTPS (clawshell.club│
+│  │ SkillMarket · CapRegistry│ │F │  │ ContextManager · N8N        │  │  │  Let's Encrypt SSL    │
+│  │ SwarmCoord · CronSched   │ │L │  └──────────────────────────────┘  │  │                       │
+│  │ Evolution · ReviewEngine │ │O │                                      │  └──────────────────────┘
+│  │ Broadcast · N8NBridge    │ │W │  ┌─ L2 自适应 ─────────────────┐  │
+│  │ Workflow · Optimizer      │ │  │  │ SelfRepair(Backup+Checkpoint)│  │
+│  │ DeepThink · CredentialMgr│ │  │  │ FeedbackLoop · AdaptiveTuner │  │
+│  │ 🆕 AuditEngine           │ │  │  │ Strategy · AdaptiveController│  │
+│  └──────────────────────────┘ │  │  └──────────────────────────────┘  │
+│                               │  │                                      │
+│  ┌─ Event Sourcing (9) ─────┐│  │  ┌─ L1 自感知 ─────────────────┐  │
+│  │ Store·Tracer·DeadLetterQ ││  │  │ System·Disk·Process·Network  │  │
+│  │ PriorityQ·Aggregator     ││  │  │ Service·Agent·Gateway        │  │
+│  │ Metrics·PatternMiner     ││  │  │ HealthChecker(27 items)      │  │
+│  │ MLEngine·QualityEval     ││  │  └──────────────────────────────┘  │
+│  └──────────────────────────┘│  │                                      │
+│                               │  │  ┌─ Core Components ─────────────┐  │
+│  ┌─ MCP Protocol ───────────┐│  │  │ EnvDetector (8 frameworks)    │  │
+│  │ MCPHub · JWT Auth         ││  │  │ IDEBridge (6 CLI agents)      │  │
+│  │ 7-Domain Router           ││  │  │ SyncDaemon(5s) · SyncEngine   │  │
+│  └──────────────────────────┘│  │  │ AdapterManager · ConfigWizard │  │
+│                               │  │  └──────────────────────────────────┘  │
+│  ┌─ Services (6) ───────────┐│  │                                      │
+│  │ VaultAPI · OSS · MemOS   ││  │  Frameworks: Hermes·OpenClaw·Wukong  │
+│  │ KnowledgeGraph            ││  │  QClaw·CoPaw·HiClaw·EasyClaw        │
+│  │ 🆕 CredentialSync        ││  │  IDEs: Codex·Claude·Kimi·DeepSeek   │
+│  │ 🆕 AccountService        ││  │  Copilot·Windsurf                    │
+│  └──────────────────────────┘│  │                                      │
+└──────────────────────────────┘  └──────────────────────────────────────┘
 
-┌──────────────────────────────────────────────────────────────────────────────┐
-│  🔄 DATA FLOW                                                                 │
-│  Cloud→Edge: REST(:8000) WSS(:8443) Tasks Events Skills Insight              │
-│  Edge→Cloud: Health Events Register Claim Discover Sync                      │
-│  SyncDaemon: scan→enqueue→flush→pull→health (5s loop)                        │
-├──────────────────────────────────────────────────────────────────────────────┤
-│  🧬 PERSISTENCE: Genome · MemOS Cloud · MemPalace · Obsidian · KnowledgeGraph│
-│  EventStore(JSON) · WorkflowState · TaskBoard · SkillMarket · Review          │
-├──────────────────────────────────────────────────────────────────────────────┤
-│  ☁️ EXTERNAL: Alibaba ECS+OSS · GitHub · N8N · Docker · Claude+OpenAI API    │
-│  ChromaDB · MemOS Cloud API · Browser Runtime · psutil · websockets           │
-└──────────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│  🔄 DATA FLOW: CloudHub ↔ Edge Brain (REST/WSS/MCP)                                │
+│  🔄 Credential Sync: AES-256-GCM → auto-push → edge decrypt                        │
+│  🔄 SyncDaemon: scan→enqueue→flush→pull→health (5s loop)                           │
+└─────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-> **完整交互式 SVG 架构图**: [docs/architecture-diagram.html](docs/architecture-diagram.html) (下载后在浏览器中打开)
+---
+
+## v2.0 核心特性
+
+| 特性 | 说明 |
+|------|------|
+| **多账户系统** | 三级角色: `core_admin` (超级管理员) / `admin` (管理员) / `user` (普通用户)，RBAC 权限矩阵 |
+| **云管理控制台** | Next.js 16 全功能 Dashboard，中/English 双语，节点拓扑可视化 |
+| **凭证管理** | AES-256-GCM 加密存储，CloudHub→Edge 自动同步，WebSocket 实时推送 |
+| **一键端侧安装** | `curl\|bash` 一键安装 + 交互式配置向导，自动注册到 CloudHub |
+| **SSL/HTTPS** | clawshell.club 域名，Let's Encrypt 自动证书，全链路 HTTPS |
+| **节点拓扑** | user→node→framework/IDE 三级拓扑关系，Dashboard 实时可视化 |
+| **审计日志** | 全操作审计记录，按用户/时间/操作类型筛选 |
+| **事件溯源增强** | 9 模块完整 Event Sourcing 体系 + DeepThink 深度推理引擎 |
+| **MCP 协议层** | 7 域路由 + JWT 鉴权 + WebSocket MCP |
 
 ---
 
-## 概述
+## 快速开始
 
-ClawShell 是一个适用于类 OpenClaw 架构的增强型外骨骼功能插件，以工程控制论为指导思想，
-核心是信息反馈、动态调控和系统整体思维。
+### 云侧部署 (CloudHub + Dashboard)
 
-采用**一云多端云边协同分布式神经架构**，由 1 个云枢（Cloud Hub）和 N 个端脑（Edge Brain）组成：
-
-- **☁️ 云枢**: 部署于阿里云 ECS，负责全局架构规划、深度思考、洞察分析、复盘总结、成果广播、终端管理
-- **🖥️ 端脑**: 安装于用户终端，自适应不同类 OpenClaw 架构，负责环境检测、IDE 桥接、任务执行和离线自治
-
----
-
-## 云枢 (Cloud Hub) — 12 Engines
-
-| 引擎 | 功能 |
-|------|------|
-| `CloudEventBus` | Persist + SHA256 Dedup + Wildcard Query + 30d Expiry |
-| `GlobalTaskBoard` | CRUD + State Machine (PENDING→IN_PROGRESS→COMPLETED/FAILED/CANCELLED/COMPENSATING) |
-| `SkillMarket` | Publish/Discover/Sync + Version History |
-| `CapabilityRegistry` | Edge Registration + Heartbeat + Load-Balanced Scheduling |
-| `SwarmCoordinator` | Multi-Node Management + Load Balance + Offline Detection |
-| `CronScheduler` | 5-field Cron Parser + 60s Check Loop |
-| `EvolutionEngine` | InsightAggregator → PatternMiner → AutoSkillPublisher |
-| `UnifiedReviewEngine` | Daily/Weekly/Monthly Review → ActionPlan + Metrics |
-| `BroadcastEngine` | Cloud Announcement + BestPracticeRegistry + CrossEdgeLearning |
-| `N8NBridge` | Event → N8N Workflow Routing |
-| `WorkflowEngine` 🆕 | Built-in Saga Compensation + StepType(TASK/PARALLEL/CONDITION/SAGA/WAIT) |
-| `GlobalOptimizer` 🆕 | Resource Quota + Cost Model + Balanced Allocation |
-
-### 🆕 Event Sourcing (9 modules)
-
-| 模块 | 功能 |
-|------|------|
-| EventStore | Append-only persistent storage + Sequence-based replay |
-| EventTracer | Causal chain tracking + Span/Trace analysis |
-| DeadLetterQueue | Failed event replay + Configurable retry |
-| PriorityQueue | Heap-based CRITICAL/HIGH/MEDIUM/LOW ordering |
-| EventAggregator | Time-window aggregation + Flush to JSON |
-| EventMetrics | Per-topic statistics + Latency + Error rate + Moving average |
-| PatternMiner | Sequential + Co-occurrence pattern detection |
-| MLEngine | Z-score anomaly detection + Linear trend analysis |
-| QualityEvaluator | 4-dim scoring (Completeness/Timeliness/Correctness/Consistency) |
-
-### 🆕 MCP Protocol Layer
-
-| 模块 | 功能 |
-|------|------|
-| MCPHub | WebSocket MCP Router + Client lifecycle |
-| JWT Auth | HS256 token generation/verification (stdlib-only) |
-| Domain Router | 7 domains: vault/skill/kanban/memory/node/workflow/genome |
-
----
-
-## 端脑 (Edge Brain) — 四层外骨骼
-
-| 层 | 名称 | 组件 |
-|----|------|------|
-| **L4** | 多Agent集群 | SwarmManager+Discovery · TrustEvaluator+Manager · EcologyMatcher · CollaborationProtocol |
-| **L3** | 自组织 | EdgeEventBus(Condition+DLQ+Tracer) · TaskOrganizer(DAG) · ContextManager · N8N |
-| **L2** | 自适应 | SelfRepair(Backup+Checkpoint) · FeedbackControlLoop · AdaptiveParameterTuner · Strategy |
-| **L1** | 自感知 | SystemMon · DiskMon · ProcessMon · NetworkMon · ServiceMon · HealthChecker(27 items) |
-
-### 🆕 Edge Gateway + Core Components
-
-| 组件 | 功能 |
-|------|------|
-| NetworkDiscovery | LAN UDP broadcast device discovery (:17660) |
-| DeviceMonitor | Real-time CPU/Mem/Disk/Net health monitoring |
-| KnowledgePuller | Cloud insight/broadcast local cache |
-| EdgeSelfHealing | Diagnose→Heal→Verify pipeline |
-| EnvDetector | 8 framework auto-detection |
-| IDEBridge | 6 Agent CLI bridges (Codex/Claude/Kimi/DeepSeek/Copilot + Orchestrator + Sandbox) |
-| EcosystemInstaller | 10 component one-click install |
-| AdapterManager | Unified Hermes/OpenClaw/Wukong adapter management |
-| SyncDaemon | 5s loop: scan→enqueue→flush→pull→health |
-
----
-
-## Data Flow
-
+```bash
+git clone https://github.com/jorinyang/ClawShell.git
+cd ClawShell
+docker compose up -d
+# CloudHub API: http://localhost:8000
+# Dashboard:    http://localhost:3000
+# 默认管理员: core_admin / clawshell
 ```
-Cloud→Edge (Push):  REST API(:8000) · WSS/MCP(:8443) · Event Push · Broadcast · Task Assign · Insight
-Edge→Cloud (Report): Event Batch · Health Report · Node Register · Task Claim · Skill Discover
-SyncDaemon 5s:       scan→enqueue→flush→pull tasks→pull insights→pull broadcasts→health
+
+### 端侧安装 (Edge Brain)
+
+```bash
+curl -fsSL https://clawshell.club/install.sh | bash
+# 交互式引导: 选择框架 → 配置 CloudHub 地址 → 自动注册
 ```
+
+### 本地开发
+
+```bash
+git clone https://github.com/jorinyang/ClawShell.git
+cd ClawShell
+pip install -e ".[cloud,edge]"
+cd dashboard && npm install && npm run dev
+```
+
+---
+
+## 架构总览
+
+### CloudHub (云枢)
+
+| 模块 | 数量 | 说明 |
+|------|------|------|
+| Core Engines | **15** | EventBus · TaskBoard · SkillMarket · CapRegistry · SwarmCoord · CronSched · Evolution · Review · Broadcast · N8N · Workflow · Optimizer · DeepThink · **CredentialMgr** · **AuditEngine** |
+| Event Sourcing | **9** | Store · Tracer · DeadLetterQ · PriorityQ · Aggregator · Metrics · PatternMiner · MLEngine · QualityEvaluator |
+| MCP Protocol | 3 | MCPHub · JWT Auth · 7-Domain Router |
+| Services | **6** | VaultAPI · OSSSync · MemOS · KnowledgeGraph · **CredentialSync** · **AccountService** |
+
+### Edge Brain (端脑)
+
+| 模块 | 数量 | 说明 |
+|------|------|------|
+| L1-L4 外骨骼 | 4 层 | 自感知 → 自适应 → 自组织 → 多Agent集群 |
+| 健康检测器 | **8** | System · Disk · Process · Network · Service · Agent · Gateway · Framework |
+| IDE 桥接器 | **6** | Codex · Claude · Kimi · DeepSeek · Copilot · Windsurf |
+| Sync Daemon | 1 | 5s 循环: scan→enqueue→flush→pull→health |
+| Edge Gateway | 4 | NetworkDiscovery · DeviceMonitor · KnowledgePuller · SelfHealing |
+
+---
+
+## API 参考 (76 Endpoints)
+
+| 类别 | 端点数 | 说明 |
+|------|--------|------|
+| 认证 & 账户 | 12 | 登录/注册/刷新Token/用户CRUD/角色管理 |
+| 凭证管理 | 8 | CRUD/加密/同步/推送/轮换 |
+| 任务管理 | 10 | 创建/查询/状态机流转/分配/补偿 |
+| 技能市场 | 6 | 发布/发现/同步/版本管理 |
+| 节点管理 | 8 | 注册/心跳/拓扑/负载均衡/离线检测 |
+| 事件系统 | 10 | 发布/查询/溯源/聚合/重放 |
+| 工作流 | 8 | 创建/执行/Saga补偿/状态查询 |
+| MCP 协议 | 6 | WebSocket连接/域路由/JWT认证 |
+| 审计日志 | 4 | 查询/导出/筛选/统计 |
+| 系统 | 4 | 健康检查/配置/版本/指标 |
+| **合计** | **76** | 48 (v1.x) + 28 (v2.0新增) |
+
+---
+
+## 权限矩阵
+
+| 资源/操作 | core_admin | admin | user |
+|-----------|:----------:|:-----:|:----:|
+| 用户管理 (CRUD) | ✅ | ✅ (本组织) | ❌ |
+| 角色分配 | ✅ | ❌ | ❌ |
+| 节点管理 | ✅ | ✅ | ✅ (自己的) |
+| 凭证管理 | ✅ | ✅ | ✅ (只读) |
+| 任务管理 | ✅ | ✅ | ✅ (自己的) |
+| 技能市场 | ✅ | ✅ | ✅ (只读) |
+| 审计日志 | ✅ | ✅ (本组织) | ❌ |
+| 系统配置 | ✅ | ❌ | ❌ |
+| 工作流管理 | ✅ | ✅ | ❌ |
 
 ---
 
@@ -181,51 +181,51 @@ SyncDaemon 5s:       scan→enqueue→flush→pull tasks→pull insights→pull 
 | 4 | 高鲁棒 | 多层级错误恢复、守护进程保活、自动降级 |
 | 5 | 高泛用 | 感知层抽象、适配器模式、标准化接口 |
 | 6 | 高协同 | EventBus + ContextManager + TaskMarket + Swarm |
-| 7 | 可移植 | 支持 macOS/Linux/WSL |
+| 7 | 可移植 | 支持 macOS / Linux / WSL |
 | 8 | 幂等性 | 重复安装不对已有配置产生副作用 |
-| 9 | 端-云版本解耦 | Cloud Hub 升级不影响 Edge Brain |
+| 9 | 端-云版本解耦 | CloudHub 升级不影响 Edge Brain |
 
 ---
-
-## 快速开始
-
-```bash
-# 端侧安装 (一键)
-curl -fsSL https://raw.githubusercontent.com/jorinyang/ClawShell/main/deploy/edge/install.sh | bash
-
-# 云侧部署 (Terraform)
-cd deploy/cloud/terraform
-terraform init && terraform apply
-
-# 本地开发
-git clone https://github.com/jorinyang/ClawShell.git
-cd ClawShell
-pip install -e ".[cloud,edge]"
-```
 
 ## 项目结构
 
 ```
 ClawShell/
-├── cloud/              # ☁️ Cloud Hub
-│   ├── engines/        #   12 engines + Workflow · Optimizer · DeepThink
-│   ├── eventing/       #   Event Sourcing (9 modules)
-│   ├── mcp/            #   MCP Protocol (Hub · JWT · Router)
-│   └── services/       #   VaultAPI · OSSSync · MemOS · KnowledgeGraph
-├── edge/               # 🖥️ Edge Brain
-│   ├── eventbus/       #   ConditionEngine + DLQ + Tracer
-│   ├── gateway/        #   NetworkDiscovery · DeviceMonitor · KnowledgePuller · SelfHealing
-│   ├── adapters/       #   Hermes · Wukong · OpenClaw + AdapterManager
-│   ├── detector/       #   8 framework detectors
-│   ├── ide_bridge/     #   6 IDE CLI bridges
-│   ├── ecosystem/      #   10 component installer
-│   └── sync/           #   SyncDaemon (5s loop) + Delta Sync
-├── exoskeleton/        # 🦴 L1-L4 外骨骼
-├── shared/             # 🔄 共享类型 · 协议 · MCP Types
-├── deploy/             # 🚀 Terraform + Docker
-├── tests/              # 🧪 412 comprehensive tests
-└── docs/               # 📚 文档 + SVG 架构图
+├── cloud/                # ☁️ CloudHub
+│   ├── engines/          #   15 engines (含 CredentialMgr · AuditEngine)
+│   ├── eventing/         #   Event Sourcing (9 modules)
+│   ├── mcp/              #   MCP Protocol (Hub · JWT · Router)
+│   └── services/         #   6 services (含 CredentialSync · AccountService)
+├── edge/                 # 🖥️ Edge Brain
+│   ├── eventbus/         #   ConditionEngine + DLQ + Tracer
+│   ├── gateway/          #   NetworkDiscovery · DeviceMonitor · SelfHealing
+│   ├── adapters/         #   Hermes · Wukong · OpenClaw + AdapterManager
+│   ├── detector/         #   8 framework detectors
+│   ├── ide_bridge/       #   6 IDE CLI bridges
+│   ├── ecosystem/        #   10 component installer
+│   └── sync/             #   SyncDaemon (5s loop) + Delta Sync
+├── dashboard/            # 📊 云管理控制台 (Next.js 16)
+│   ├── app/              #   Pages: auth · nodes · credentials · audit · topology
+│   ├── components/       #   UI 组件 (中/English)
+│   └── lib/              #   API client · Auth · i18n
+├── exoskeleton/          # 🦴 L1-L4 外骨骼
+├── shared/               # 🔄 共享类型 · 协议 · MCP Types
+├── deploy/               # 🚀 Docker Compose · Terraform · install.sh
+├── tests/                # 🧪 测试套件
+└── docs/                 # 📚 文档 + SVG 架构图
 ```
+
+---
+
+## 版本历史
+
+| 版本 | 日期 | 关键变更 |
+|------|------|----------|
+| **v2.0** | 2026-05 | 多账户系统 · 云管理控制台 · 凭证管理 · 节点拓扑 · 审计日志 · SSL/HTTPS · 76 API |
+| v1.12 | 2026-03 | Event Sourcing (9模块) · MCP Protocol Layer · Edge Gateway · Workflow · Optimizer · DeepThink |
+| v1.0 | 2025-12 | 初始发布: CloudHub (12 engines) · Edge Brain (L1-L4外骨骼) · 8 检测器 · 6 IDE桥接 · SyncDaemon |
+
+---
 
 ## 许可证
 

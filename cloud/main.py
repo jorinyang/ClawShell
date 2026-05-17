@@ -118,9 +118,11 @@ def create_app() -> FastAPI:
     # ── v2.0 Auth & Admin Routers ────────────────────
     from cloud.routers.auth import router as auth_router
     from cloud.routers.admin import router as admin_router
+    from cloud.routers.credentials import router as credentials_router
 
-    app.include_router(auth_router, prefix="/api/v2")
-    app.include_router(admin_router, prefix="/api/v2")
+    app.include_router(auth_router, prefix="/api/v1")
+    app.include_router(admin_router, prefix="/api/v1")
+    app.include_router(credentials_router, prefix="/api/v1")
 
     return app
 

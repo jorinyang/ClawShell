@@ -119,6 +119,66 @@ async def change_password(data: PasswordChange, request: Request):
         raise HTTPException(status_code=400, detail=str(e))
 
 
+# ── User Credential Endpoints ────────────────────────
+
+from cloud.auth.models import CredentialCreate, CredentialResponse, CredentialUpdate
+from cloud.auth.credential_service import CredentialService
+
+
+@router.post("/credentials", response_model=CredentialResponse)
+async def create_credential(data: CredentialCreate, request: Request):
+    """Create a credential for the current user."""
+    payload = _require_auth(request)
+    try:
+        cred = CredentialService.create_credential(payload["sub"], data)
+        AuditService.log(payload["sub"], "cred_create", target=data.service, ip=_get_client_ip(request))
+        return cred
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/credentials", response_model=list[CredentialResponse])
+async def list_credentials(request: Request):
+    """List current user's credentials (values masked)."""
+    payload = _require_auth(request)
+    return CredentialService.get_user_credentials(payload["sub"])
+
+
+@router.put("/credentials/{cred_id}", response_model=CredentialResponse)
+async def update_credential(cred_id: str, data: CredentialUpdate, request: Request):
+    """Update a credential."""
+    payload = _require_auth(request)
+    try:
+        cred = CredentialService.update_credential(cred_id, payload["sub"], data)
+        if not cred:
+            raise HTTPException(status_code=404, detail="Credential not found")
+        AuditService.log(payload["sub"], "cred_update", target=cred_id, ip=_get_client_ip(request))
+        return cred
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/credentials/{cred_id}")
+async def delete_credential(cred_id: str, request: Request):
+    """Delete a credential."""
+    payload = _require_auth(request)
+    ok = CredentialService.delete_credential(cred_id, payload["sub"])
+    if not ok:
+        raise HTTPException(status_code=404, detail="Credential not found")
+    AuditService.log(payload["sub"], "cred_delete", target=cred_id, ip=_get_client_ip(request))
+    return {"status": "ok", "message": "Credential deleted"}
+
+
+@router.get("/credentials/sync")
+async def sync_credentials(request: Request):
+    """Sync credentials: user's own + shared credentials."""
+    payload = _require_auth(request)
+    result = CredentialService.sync_credentials(payload["sub"])
+    return result
+
+
 # ── Helpers ──────────────────────────────────────────
 
 def _extract_token(request: Request) -> str:

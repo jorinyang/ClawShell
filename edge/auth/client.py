@@ -69,7 +69,7 @@ class AuthClient:
         with self._lock:
             resp = self._request(
                 "POST",
-                "/api/v2/auth/login",
+                "/api/v1/auth/login",
                 body={"account_id": account_id, "password": password},
             )
             if "token" in resp:
@@ -84,7 +84,7 @@ class AuthClient:
     def logout(self, token: str) -> dict:
         """Revoke session on cloud hub."""
         with self._lock:
-            resp = self._request("POST", "/api/v2/auth/logout", token=token)
+            resp = self._request("POST", "/api/v1/auth/logout", token=token)
             return {"success": resp.get("status") == "ok" or "error" not in resp}
 
     def refresh(self, token: str) -> dict:
@@ -94,7 +94,7 @@ class AuthClient:
             {success, token, expires_at} or {success: False, error}
         """
         with self._lock:
-            resp = self._request("POST", "/api/v2/auth/refresh", token=token)
+            resp = self._request("POST", "/api/v1/auth/refresh", token=token)
             if "token" in resp:
                 return {
                     "success": True,
@@ -108,7 +108,7 @@ class AuthClient:
         with self._lock:
             resp = self._request(
                 "PUT",
-                "/api/v2/auth/password",
+                "/api/v1/auth/password",
                 body={"old_password": old_password, "new_password": new_password},
                 token=token,
             )
@@ -119,7 +119,7 @@ class AuthClient:
     def me(self, token: str) -> dict:
         """Get current user info."""
         with self._lock:
-            resp = self._request("GET", "/api/v2/auth/me", token=token)
+            resp = self._request("GET", "/api/v1/auth/me", token=token)
             if "user_id" in resp:
                 return {"success": True, "user": resp}
             return {"success": False, "error": resp.get("error", "Failed to get user info")}
