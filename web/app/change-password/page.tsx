@@ -8,7 +8,6 @@ import { useAuthStore } from "@/lib/auth-store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { KeyRound } from "lucide-react";
 
 export default function ChangePasswordPage() {
@@ -44,54 +43,53 @@ export default function ChangePasswordPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-warning/15">
-            <KeyRound className="h-8 w-8 text-warning" />
+      <div className="w-full max-w-[360px]">
+        <div className="mb-8 text-center">
+          <div className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-[rgba(245,158,11,0.12)]">
+            <KeyRound className="h-5 w-5 text-warning" />
           </div>
-          <CardTitle className="text-2xl">{t("title")}</CardTitle>
-          <CardDescription>{t("subtitle")}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label>{t("oldPassword")}</Label>
-              <Input
-                type="password"
-                value={oldPassword}
-                onChange={(e) => setOldPassword(e.target.value)}
-                required
-              />
+          <h1 className="text-lg font-medium text-foreground">{t("title")}</h1>
+          <p className="mt-1 text-xs text-text-quaternary">{t("subtitle")}</p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label>{t("oldPassword")}</Label>
+            <Input
+              type="password"
+              value={oldPassword}
+              onChange={(e) => setOldPassword(e.target.value)}
+              required
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>{t("newPassword")}</Label>
+            <Input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              required
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>{t("confirmPassword")}</Label>
+            <Input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+            />
+          </div>
+          {error && (
+            <div className="rounded-[6px] bg-[rgba(239,68,68,0.08)] px-3 py-2 text-xs text-destructive">
+              {error}
             </div>
-            <div className="space-y-2">
-              <Label>{t("newPassword")}</Label>
-              <Input
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>{t("confirmPassword")}</Label>
-              <Input
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-              />
-            </div>
-            {error && (
-              <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
-                {error}
-              </div>
-            )}
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "..." : t("submit")}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+          )}
+          <Button type="submit" variant="default" className="w-full" disabled={loading}>
+            {loading ? "..." : t("submit")}
+          </Button>
+        </form>
+      </div>
     </div>
   );
 }

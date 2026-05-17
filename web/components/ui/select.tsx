@@ -13,18 +13,18 @@ const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
     <select
       ref={ref}
       className={cn(
-        "flex h-9 w-full rounded-md border border-border bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
+        "flex h-9 w-full rounded-[6px] border border-border bg-[rgba(255,255,255,0.02)] px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
         className
       )}
       {...props}
     >
       {placeholder && (
-        <option value="" className="bg-card text-muted-foreground">
+        <option value="" className="bg-panel text-text-tertiary">
           {placeholder}
         </option>
       )}
       {options.map((opt) => (
-        <option key={opt.value} value={opt.value} className="bg-card">
+        <option key={opt.value} value={opt.value} className="bg-panel">
           {opt.label}
         </option>
       ))}

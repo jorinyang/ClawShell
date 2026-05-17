@@ -17,9 +17,9 @@ export function LanguageSwitcher() {
   return (
     <button
       onClick={toggle}
-      className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+      className="flex h-8 items-center gap-1.5 rounded-[6px] border border-border px-2.5 text-xs text-text-tertiary transition-colors hover:bg-[rgba(255,255,255,0.04)] hover:text-text-secondary"
     >
-      <Globe className="h-4 w-4" />
+      <Globe className="h-3.5 w-3.5" />
       {locale === "zh" ? "中文" : "EN"}
     </button>
   );

@@ -1,0 +1,12 @@
+{
+  "/_not-found/page": "/_not-found",
+  "/audit/page": "/audit",
+  "/credentials/page": "/credentials",
+  "/change-password/page": "/change-password",
+  "/endpoints/page": "/endpoints",
+  "/login/page": "/login",
+  "/nodes/page": "/nodes",
+  "/page": "/",
+  "/system/page": "/system",
+  "/users/page": "/users"
+}

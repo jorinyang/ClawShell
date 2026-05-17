@@ -2,7 +2,6 @@
 
 import { useTranslations } from "next-intl";
 import { LanguageSwitcher } from "./LanguageSwitcher";
-import { useAuthStore } from "@/lib/auth-store";
 import { usePathname } from "next/navigation";
 
 const pageTitles: Record<string, string> = {
@@ -21,9 +20,9 @@ export function TopBar() {
   const titleKey = pageTitles[pathname] || "dashboard";
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-card/80 px-6 backdrop-blur">
-      <h1 className="text-xl font-semibold">{t(titleKey)}</h1>
-      <div className="flex items-center gap-4">
+    <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-background/80 px-8 backdrop-blur-sm">
+      <h1 className="text-sm font-medium text-text-secondary">{t(titleKey)}</h1>
+      <div className="flex items-center gap-3">
         <LanguageSwitcher />
       </div>
     </header>

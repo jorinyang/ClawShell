@@ -3,8 +3,7 @@
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { api } from "@/lib/api";
-import { Sidebar } from "@/components/Sidebar";
-import { TopBar } from "@/components/TopBar";
+import { AppShell } from "@/components/AppShell";
 import { StatusCard } from "@/components/StatusCard";
 import { EngineStatus } from "@/components/EngineStatus";
 import { ResourceChart } from "@/components/ResourceChart";
@@ -35,85 +34,74 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen">
-        <Sidebar />
-        <div className="ml-64 flex-1">
-          <TopBar />
-          <div className="flex h-64 items-center justify-center">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-          </div>
+      <AppShell>
+        <div className="flex h-64 items-center justify-center">
+          <div className="h-5 w-5 animate-spin rounded-full border-2 border-accent border-t-transparent" />
         </div>
-      </div>
+      </AppShell>
     );
   }
 
   return (
-    <div className="flex min-h-screen">
-      <Sidebar />
-      <div className="ml-64 flex-1">
-        <TopBar />
-        <main className="space-y-6 p-6">
-          {/* Stats Cards */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <StatusCard
-              title={t("totalUsers")}
-              value={data?.total_users ?? 0}
-              icon={Users}
-              color="default"
-            />
-            <StatusCard
-              title={t("activeUsers")}
-              value={data?.active_users ?? 0}
-              icon={Activity}
-              color="success"
-            />
-            <StatusCard
-              title={t("totalCredentials")}
-              value={data?.total_credentials ?? 0}
-              icon={Key}
-              color="info"
-            />
-            <StatusCard
-              title={t("totalNodes")}
-              value={data?.total_nodes ?? 0}
-              icon={Server}
-              color="warning"
-            />
-          </div>
+    <AppShell>
+      <div className="space-y-6 max-w-[1200px]">
+        {/* Stats Grid */}
+        <div className="grid grid-cols-4 gap-4">
+          <StatusCard
+            title={t("totalUsers")}
+            value={data?.total_users ?? 0}
+            icon={Users}
+          />
+          <StatusCard
+            title={t("activeUsers")}
+            value={data?.active_users ?? 0}
+            icon={Activity}
+            color="success"
+          />
+          <StatusCard
+            title={t("totalCredentials")}
+            value={data?.total_credentials ?? 0}
+            icon={Key}
+          />
+          <StatusCard
+            title={t("totalNodes")}
+            value={data?.total_nodes ?? 0}
+            icon={Server}
+          />
+        </div>
 
-          {/* Second Row */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <StatusCard
-              title={t("onlineNodes")}
-              value={data?.online_nodes ?? 0}
-              icon={Wifi}
-              color="success"
-            />
-            <StatusCard
-              title={t("activeSessions")}
-              value={data?.active_sessions ?? 0}
-              icon={Monitor}
-              color="info"
-            />
-            <StatusCard
-              title={t("recentAudit")}
-              value={data?.recent_audit_count ?? 0}
-              icon={FileText}
-              color="default"
-            />
-          </div>
+        {/* Second Row */}
+        <div className="grid grid-cols-3 gap-4">
+          <StatusCard
+            title={t("onlineNodes")}
+            value={data?.online_nodes ?? 0}
+            icon={Wifi}
+            color="success"
+          />
+          <StatusCard
+            title={t("activeSessions")}
+            value={data?.active_sessions ?? 0}
+            icon={Monitor}
+            color="info"
+          />
+          <StatusCard
+            title={t("recentAudit")}
+            value={data?.recent_audit_count ?? 0}
+            icon={FileText}
+          />
+        </div>
 
-          {/* Engine & Resources */}
-          <div className="grid gap-6 lg:grid-cols-2">
-            <EngineStatus
-              onlineNodes={data?.online_nodes ?? 0}
-              totalNodes={data?.total_nodes ?? 0}
-              activeSessions={data?.active_sessions ?? 0}
-            />
-            <ResourceChart cpu={45} memory={62} disk={38} />
-          </div>
-        </main>
+        {/* Engine & Resources */}
+        <div className="grid grid-cols-2 gap-4">
+          <EngineStatus
+            onlineNodes={data?.online_nodes ?? 0}
+            totalNodes={data?.total_nodes ?? 0}
+            activeSessions={data?.active_sessions ?? 0}
+            t={t}
+          />
+          <ResourceChart cpu={45} memory={62} disk={38} t={t} />
+        </div>
       </div>
-    </div>
+    </AppShell>
   );
 }

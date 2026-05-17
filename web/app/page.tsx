@@ -18,10 +18,6 @@ export default function HomePage() {
 
   if (!token) return null;
 
-  return <DashboardContent />;
-}
-
-function DashboardContent() {
   return <DashboardPage />;
 }
 

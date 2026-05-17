@@ -1,15 +1,11 @@
 "use client";
 
-import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { LucideIcon } from "lucide-react";
 
 interface StatusCardProps {
   title: string;
   value: string | number;
-  icon: LucideIcon;
-  description?: string;
-  trend?: "up" | "down" | "neutral";
+  icon: React.ComponentType<{ className?: string }>;
   color?: "default" | "success" | "warning" | "info" | "destructive";
 }
 
@@ -17,43 +13,35 @@ const colorMap = {
   default: "text-foreground",
   success: "text-success",
   warning: "text-warning",
-  info: "text-info",
+  info: "text-accent",
   destructive: "text-destructive",
 };
 
-const iconBgMap = {
-  default: "bg-primary/15 text-primary",
-  success: "bg-success/15 text-success",
-  warning: "bg-warning/15 text-warning",
-  info: "bg-info/15 text-info",
-  destructive: "bg-destructive/15 text-destructive",
+const iconColorMap = {
+  default: "text-text-tertiary",
+  success: "text-success",
+  warning: "text-warning",
+  info: "text-accent",
+  destructive: "text-destructive",
 };
 
 export function StatusCard({
   title,
   value,
   icon: Icon,
-  description,
   color = "default",
 }: StatusCardProps) {
   return (
-    <Card>
-      <CardContent className="p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm text-muted-foreground">{title}</p>
-            <p className={cn("mt-1 text-3xl font-bold", colorMap[color])}>
-              {value}
-            </p>
-            {description && (
-              <p className="mt-1 text-xs text-muted-foreground">{description}</p>
-            )}
-          </div>
-          <div className={cn("rounded-xl p-3", iconBgMap[color])}>
-            <Icon className="h-6 w-6" />
-          </div>
+    <div className="rounded-lg border border-border bg-[rgba(255,255,255,0.02)] p-5">
+      <div className="flex items-start justify-between">
+        <div className="space-y-1">
+          <p className="text-xs font-medium text-text-quaternary">{title}</p>
+          <p className={cn("text-2xl font-medium tracking-tight", colorMap[color])}>
+            {value}
+          </p>
         </div>
-      </CardContent>
-    </Card>
+        <Icon className={cn("h-4 w-4 mt-0.5", iconColorMap[color])} />
+      </div>
+    </div>
   );
 }

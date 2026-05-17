@@ -8,7 +8,6 @@ import { useAuthStore } from "@/lib/auth-store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Shield, Eye, EyeOff } from "lucide-react";
 
 export default function LoginPage() {
@@ -43,62 +42,63 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/15">
-            <Shield className="h-8 w-8 text-primary" />
+      <div className="w-full max-w-[360px]">
+        {/* Logo */}
+        <div className="mb-8 text-center">
+          <div className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-[rgba(94,106,210,0.12)]">
+            <Shield className="h-5 w-5 text-accent" />
           </div>
-          <CardTitle className="text-2xl">{t("title")}</CardTitle>
-          <CardDescription>{t("subtitle")}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="accountId">{t("accountId")}</Label>
+          <h1 className="text-lg font-medium text-foreground">{t("title")}</h1>
+          <p className="mt-1 text-xs text-text-quaternary">{t("subtitle")}</p>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={handleLogin} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="accountId">{t("accountId")}</Label>
+            <Input
+              id="accountId"
+              value={accountId}
+              onChange={(e) => setAccountId(e.target.value)}
+              placeholder={t("accountPlaceholder")}
+              required
+              autoFocus
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="password">{t("password")}</Label>
+            <div className="relative">
               <Input
-                id="accountId"
-                value={accountId}
-                onChange={(e) => setAccountId(e.target.value)}
-                placeholder={t("accountPlaceholder")}
+                id="password"
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder={t("passwordPlaceholder")}
                 required
-                autoFocus
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-text-quaternary hover:text-text-secondary"
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">{t("password")}</Label>
-              <div className="relative">
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder={t("passwordPlaceholder")}
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
+          </div>
+          {error && (
+            <div className="rounded-[6px] bg-[rgba(239,68,68,0.08)] px-3 py-2 text-xs text-destructive">
+              {error}
             </div>
-            {error && (
-              <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
-                {error}
-              </div>
+          )}
+          <Button type="submit" variant="default" className="w-full" disabled={loading}>
+            {loading ? (
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
+            ) : (
+              t("loginButton")
             )}
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? (
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
-              ) : (
-                t("loginButton")
-              )}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+          </Button>
+        </form>
+      </div>
     </div>
   );
 }

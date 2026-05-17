@@ -117,11 +117,15 @@ class AuthClient:
             return {"success": False, "error": resp.get("error", "Password change failed"), "detail": resp.get("detail", {})}
 
     def me(self, token: str) -> dict:
-        """Get current user info."""
+        """Get current user info.
+
+        Returns:
+            {success, user_id, account_id, display_name, role, ...} or {success: False, error}
+        """
         with self._lock:
             resp = self._request("GET", "/api/v1/auth/me", token=token)
             if "user_id" in resp:
-                return {"success": True, "user": resp}
+                return {"success": True, **resp}
             return {"success": False, "error": resp.get("error", "Failed to get user info")}
 
     def sync_credentials(self, token: str) -> dict:

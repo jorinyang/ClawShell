@@ -5,8 +5,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ClawShell - Admin Dashboard",
-  description: "ClawShell v2.0 Administration Dashboard",
+  title: "ClawShell",
+  description: "ClawShell Administration Dashboard",
 };
 
 export default async function RootLayout({
@@ -19,8 +19,8 @@ export default async function RootLayout({
   const messages = await getMessages();
 
   return (
-    <html lang={locale}>
-      <body>
+    <html lang={locale} className="dark">
+      <body className="bg-background text-foreground antialiased">
         <NextIntlClientProvider messages={messages}>
           {children}
         </NextIntlClientProvider>
