@@ -10,6 +10,11 @@ from .manager import (
     HookEntry,
     HookManager,
 )
+from .registry import (
+    get_hook_manager,
+    reset_hook_manager,
+    trigger_hook,
+)
 
 __all__ = [
     "HookEvent",
@@ -17,4 +22,7 @@ __all__ = [
     "HookContext",
     "HookEntry",
     "HookManager",
+    "get_hook_manager",
+    "reset_hook_manager",
+    "trigger_hook",
 ]

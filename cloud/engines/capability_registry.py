@@ -17,6 +17,7 @@ import threading
 from typing import Dict, List, Optional, Any, Tuple
 from collections import defaultdict
 
+from shared.trust import TrustEvaluator, NodeMetrics, TrustLevel
 
 class CapabilityRegistry:
     """Edge node registry with heartbeat monitoring and load-aware scheduling."""
@@ -33,10 +34,12 @@ class CapabilityRegistry:
 
         os.makedirs(data_dir, exist_ok=True)
         self._state_file = os.path.join(data_dir, "nodes.json")
+        self._trust_file = os.path.join(data_dir, "trust_state.json")
 
         # RLock — reentrant for nested calls
         self._lock = threading.RLock()
         self._nodes: Dict[str, dict] = {}  # node_id → node dict
+        self._trust_evaluator = TrustEvaluator(persistence_path=self._trust_file)
 
         # Daemon
         self._running = False
@@ -84,6 +87,21 @@ class CapabilityRegistry:
                 mem = metrics.get("memory_percent", 0)
                 node["load_score"] = (cpu * 0.5 + mem * 0.5) / 100.0
 
+                # Extract trust-related metrics from heartbeat
+                trust_metrics = NodeMetrics(
+                    messages_sent=metrics.get("messages_sent", 0),
+                    messages_received=metrics.get("messages_received", 0),
+                    hmac_failures=metrics.get("hmac_failures", 0),
+                    threat_detections=metrics.get("threat_detections", 0),
+                    uptime_seconds=metrics.get("uptime_seconds", 0.0),
+                    total_seconds=metrics.get("total_seconds", 0.0),
+                    tasks_completed=metrics.get("tasks_completed", 0),
+                    tasks_failed=metrics.get("tasks_failed", 0),
+                )
+                trust_score = self._trust_evaluator.record_metrics(node_id, trust_metrics)
+                node["trust_score"] = trust_score.score
+                node["trust_level"] = trust_score.level.name
+
             self._save()
             return True
 
@@ -109,6 +127,27 @@ class CapabilityRegistry:
                 if n.get("status") == "online"
             )
 
+    @property
+    def trust_evaluator(self) -> TrustEvaluator:
+        """Access the trust evaluator instance."""
+        return self._trust_evaluator
+
+    def get_trusted_nodes(self, min_trust_level: TrustLevel = TrustLevel.STANDARD) -> List[dict]:
+        """Get online nodes that meet or exceed the minimum trust level."""
+        with self._lock:
+            result = []
+            for nid, node in self._nodes.items():
+                if node.get("status") != "online":
+                    continue
+                level_name = node.get("trust_level", "STANDARD")
+                try:
+                    node_level = TrustLevel[level_name]
+                except KeyError:
+                    node_level = TrustLevel.STANDARD
+                if node_level.value >= min_trust_level.value:
+                    result.append(dict(node))
+            return result
+
     def deregister(self, node_id: str) -> bool:
         """Remove a node from the registry."""
         with self._lock:
@@ -121,6 +160,10 @@ class CapabilityRegistry:
     def assign_task(self, required_capabilities: List[str],
                     exclude_nodes: Optional[List[str]] = None) -> Optional[str]:
         """Assign task to least-loaded node matching capabilities.
+
+        Prefers nodes with higher trust_score. Uses a composite score:
+            composite = load_score * 0.6 + (1 - trust_score) * 0.4
+        Lower composite is better (low load + high trust).
 
         Returns node_id of the best match, or None if no match found.
         """
@@ -137,12 +180,16 @@ class CapabilityRegistry:
                 required = set(required_capabilities)
 
                 if not required or required.issubset(node_caps):
-                    candidates.append((nid, node.get("load_score", 0)))
+                    load = node.get("load_score", 0)
+                    trust = node.get("trust_score", 0.5)
+                    # Composite: lower is better
+                    composite = load * 0.6 + (1.0 - trust) * 0.4
+                    candidates.append((nid, composite))
 
             if not candidates:
                 return None
 
-            # Sort by load_score ASC (least loaded first)
+            # Sort by composite ASC (best combination of low load + high trust)
             candidates.sort(key=lambda x: x[1])
             return candidates[0][0]
 
@@ -210,6 +257,12 @@ class CapabilityRegistry:
                 if now - last_hb > self._heartbeat_timeout:
                     if node.get("status") != "offline":
                         node["status"] = "offline"
+                        # Record negative trust signal for going offline
+                        self._trust_evaluator.record_threat_detection(node_id)
+                        # Re-evaluate trust score after offline event
+                        trust_score = self._trust_evaluator.evaluate(node_id)
+                        node["trust_score"] = trust_score.score
+                        node["trust_level"] = trust_score.level.name
                         changed = True
                 elif now - last_hb > self._heartbeat_interval * 2:
                     if node.get("status") != "degraded":
@@ -226,6 +279,11 @@ class CapabilityRegistry:
             with open(self._state_file, "w", encoding="utf-8") as f:
                 json.dump(list(self._nodes.values()), f, ensure_ascii=False, default=str)
         except OSError:
+            pass
+        # Persist trust state alongside node data
+        try:
+            self._trust_evaluator.save(self._trust_file)
+        except (OSError, ValueError):
             pass
 
     def _load(self):

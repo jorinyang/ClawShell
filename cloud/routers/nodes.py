@@ -26,6 +26,12 @@ def _get_registry():
     return _capability_registry
 
 
+def _get_topology():
+    """Get TopologyManager from global engine reference (optional)."""
+    from cloud.main import _topology
+    return _topology  # May be None if not initialized yet
+
+
 # ── Node Registration ─────────────────────────────
 
 @router.post("/nodes/register")
@@ -43,6 +49,17 @@ async def register_node(request: Request):
     registry = _get_registry()
     try:
         nid = registry.register(body)
+        # Auto-register in TopologyManager
+        topology = _get_topology()
+        if topology:
+            try:
+                topology.add_node(
+                    node_id=nid,
+                    capabilities=body.get("capabilities"),
+                    trust_score=body.get("trust_score", 0.5),
+                )
+            except ValueError:
+                pass  # Already registered in topology
         return format_api_response(True, data={"node_id": nid, "status": "registered"})
     except ValueError as e:
         return format_api_response(False, error=str(e))
@@ -96,6 +113,14 @@ async def deregister_node(node_id: str):
     """Deregister a node."""
     registry = _get_registry()
     ok = registry.deregister(node_id)
+    # Also remove from topology
+    if ok:
+        topology = _get_topology()
+        if topology:
+            try:
+                topology.remove_node(node_id)
+            except ValueError:
+                pass  # Not in topology
     if not ok:
         return format_api_response(False, error=f"Node '{node_id}' not found")
     return format_api_response(True, data={"node_id": node_id, "status": "deregistered"})

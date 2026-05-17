@@ -1,8 +1,8 @@
 {
   "/_not-found/page": "app/_not-found/page.js",
   "/audit/page": "app/audit/page.js",
-  "/credentials/page": "app/credentials/page.js",
   "/change-password/page": "app/change-password/page.js",
+  "/credentials/page": "app/credentials/page.js",
   "/endpoints/page": "app/endpoints/page.js",
   "/login/page": "app/login/page.js",
   "/nodes/page": "app/nodes/page.js",

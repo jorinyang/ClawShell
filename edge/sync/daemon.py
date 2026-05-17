@@ -24,6 +24,13 @@ import urllib.error
 import logging
 from typing import Dict, List, Optional, Any
 
+try:
+    from shared.hooks.registry import trigger_hook
+    from shared.hooks.manager import HookEvent
+except ImportError:
+    trigger_hook = None
+    HookEvent = None
+
 logger = logging.getLogger(__name__)
 
 
@@ -323,6 +330,26 @@ class EdgeSyncDaemon:
 
     def _sync_cycle(self) -> dict:
         """Execute one complete sync cycle."""
+        # Pre-sync hook: allow cancellation
+        if trigger_hook is not None:
+            try:
+                pre_ctx = trigger_hook(
+                    HookEvent.PRE_SYNC,
+                    {"cycle": self._stats["cycles"] + 1},
+                    source="sync_daemon",
+                )
+                if pre_ctx.cancelled:
+                    logger.debug("Sync cycle skipped (PRE_SYNC hook cancelled)")
+                    return {
+                        "events_flushed": 0,
+                        "tasks_pulled": 0,
+                        "insights_pulled": 0,
+                        "broadcasts_pulled": 0,
+                        "skipped": True,
+                    }
+            except Exception:
+                pass
+
         cycle_start = time.time()
         result = {
             "events_flushed": 0,
@@ -383,6 +410,17 @@ class EdgeSyncDaemon:
             if not (self._ws_client and self._ws_client.connected):
                 # Only poll if WebSocket is not connected
                 self._sync_credentials()
+
+        # Post-sync hook
+        if trigger_hook is not None:
+            try:
+                trigger_hook(
+                    HookEvent.POST_SYNC,
+                    {"result": result, "duration": time.time() - cycle_start},
+                    source="sync_daemon",
+                )
+            except Exception:
+                pass
 
         return result
 

@@ -9,6 +9,13 @@ import threading, time, uuid
 from collections import defaultdict
 from typing import Any, Callable, Dict, List, Optional
 
+try:
+    from shared.hooks.registry import trigger_hook
+    from shared.hooks.manager import HookEvent
+except ImportError:
+    trigger_hook = None
+    HookEvent = None
+
 class EdgeEventBus:
     """Enhanced local event bus with pub/sub and condition routing."""
 
@@ -46,6 +53,18 @@ class EdgeEventBus:
                 callback(event)
             except Exception:
                 pass
+
+        # Bridge to hook system
+        if trigger_hook is not None:
+            try:
+                trigger_hook(
+                    HookEvent.POST_EVENT,
+                    {"event_type": event_type, "event": event},
+                    source=source or "eventbus",
+                )
+            except Exception:
+                pass
+
         return event
 
     def get_history(self, event_type: Optional[str] = None, limit: int = 100) -> List[dict]:

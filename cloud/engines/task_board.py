@@ -18,6 +18,13 @@ import threading
 from typing import Dict, List, Optional, Any
 from enum import Enum
 
+try:
+    from shared.hooks.registry import trigger_hook
+    from shared.hooks.manager import HookEvent
+except ImportError:
+    trigger_hook = None
+    HookEvent = None
+
 
 class TaskStatus(str, Enum):
     PENDING = "pending"
@@ -99,7 +106,19 @@ class GlobalTaskBoard:
 
             self._tasks[task_id] = task
             self._save()
-            return task_id
+
+        # Pre-task hook
+        if trigger_hook is not None:
+            try:
+                trigger_hook(
+                    HookEvent.PRE_TASK,
+                    {"task_id": task_id, "task": dict(task)},
+                    source="taskboard",
+                )
+            except Exception:
+                pass
+
+        return task_id
 
     def get_task(self, task_id: str) -> Optional[dict]:
         """Get a task by ID."""
@@ -223,7 +242,20 @@ class GlobalTaskBoard:
                     "data": result,
                 })
             self._save()
-            return dict(task)
+            task_snapshot = dict(task)
+
+        # Post-task hook (for completed/failed tasks)
+        if trigger_hook is not None and target in (TaskStatus.COMPLETED, TaskStatus.FAILED):
+            try:
+                trigger_hook(
+                    HookEvent.POST_TASK,
+                    {"task_id": task_id, "task": task_snapshot, "target_status": target.value},
+                    source="taskboard",
+                )
+            except Exception:
+                pass
+
+        return task_snapshot
 
     # ── Smart Dispatch ────────────────────────────
 

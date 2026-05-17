@@ -17,6 +17,8 @@ import threading
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 
+from shared.trust import TrustEvaluator, TrustLevel
+from shared.trust import NodeMetrics as TrustNodeMetrics
 
 class SwarmCoordinator:
     """Manage edge nodes, heartbeats, and load balancing."""
@@ -34,10 +36,12 @@ class SwarmCoordinator:
         self._heartbeat_timeout = heartbeat_timeout or self.HEARTBEAT_TIMEOUT
         os.makedirs(data_dir, exist_ok=True)
         self._state_file = os.path.join(data_dir, "swarm_nodes.json")
+        self._trust_file = os.path.join(data_dir, "swarm_trust_state.json")
 
         self._lock = threading.RLock()
         self._nodes: Dict[str, dict] = {}
         self._events: List[dict] = []  # Recent swarm events
+        self._trust_evaluator = TrustEvaluator(persistence_path=self._trust_file)
 
         self._running = False
         self._monitor_thread: Optional[threading.Thread] = None
@@ -86,6 +90,21 @@ class SwarmCoordinator:
                 disk = metrics.get("disk_percent", 0)
                 node["load_score"] = (cpu * 0.4 + mem * 0.4 + disk * 0.2) / 100.0
 
+                # Update trust score from heartbeat metrics
+                trust_metrics = TrustNodeMetrics(
+                    messages_sent=metrics.get("messages_sent", 0),
+                    messages_received=metrics.get("messages_received", 0),
+                    hmac_failures=metrics.get("hmac_failures", 0),
+                    threat_detections=metrics.get("threat_detections", 0),
+                    uptime_seconds=metrics.get("uptime_seconds", 0.0),
+                    total_seconds=metrics.get("total_seconds", 0.0),
+                    tasks_completed=metrics.get("tasks_completed", 0),
+                    tasks_failed=metrics.get("tasks_failed", 0),
+                )
+                trust_score = self._trust_evaluator.record_metrics(node_id, trust_metrics)
+                node["trust_score"] = trust_score.score
+                node["trust_level"] = trust_score.level.name
+
             self._save()
             return True
 
@@ -108,6 +127,27 @@ class SwarmCoordinator:
         with self._lock:
             return sum(1 for n in self._nodes.values() if n.get("status") == "online")
 
+    @property
+    def trust_evaluator(self) -> TrustEvaluator:
+        """Access the trust evaluator instance."""
+        return self._trust_evaluator
+
+    def get_trusted_nodes(self, min_trust_level: TrustLevel = TrustLevel.STANDARD) -> List[dict]:
+        """Get online nodes that meet or exceed the minimum trust level."""
+        with self._lock:
+            result = []
+            for nid, node in self._nodes.items():
+                if node.get("status") != "online":
+                    continue
+                level_name = node.get("trust_level", "STANDARD")
+                try:
+                    node_level = TrustLevel[level_name]
+                except KeyError:
+                    node_level = TrustLevel.STANDARD
+                if node_level.value >= min_trust_level.value:
+                    result.append(dict(node))
+            return result
+
     def deregister_node(self, node_id: str) -> bool:
         """Remove a node."""
         with self._lock:
@@ -118,11 +158,14 @@ class SwarmCoordinator:
                 return True
             return False
 
-    # ── Load Balancing ────────────────────────────
-
     def get_least_loaded_node(self, required_capabilities: Optional[List[str]] = None,
                               exclude: Optional[List[str]] = None) -> Optional[str]:
-        """Find the least-loaded online node with matching capabilities."""
+        """Find the least-loaded online node with matching capabilities.
+
+        Considers trust_score as a weighting factor alongside load.
+        Uses composite score: load_score * 0.6 + (1 - trust_score) * 0.4
+
+        """
         exclude_set = set(exclude or [])
         with self._lock:
             candidates = []
@@ -137,12 +180,15 @@ class SwarmCoordinator:
                     if not set(required_capabilities).issubset(node_caps):
                         continue
 
-                candidates.append((nid, node.get("load_score", 0), node.get("task_count", 0)))
+                load = node.get("load_score", 0)
+                trust = node.get("trust_score", 0.5)
+                composite = load * 0.6 + (1.0 - trust) * 0.4
+                candidates.append((nid, composite, node.get("task_count", 0)))
 
             if not candidates:
                 return None
 
-            # Sort by load_score ASC, then task_count ASC
+            # Sort by composite ASC (best load+trust combo), then task_count ASC
             candidates.sort(key=lambda x: (x[1], x[2]))
             return candidates[0][0]
 
@@ -212,6 +258,11 @@ class SwarmCoordinator:
                     if node.get("status") != "offline":
                         node["status"] = "offline"
                         self._log_event("node_offline", {"node_id": node_id, "gap_seconds": gap})
+                        # Record negative trust signal for going offline
+                        self._trust_evaluator.record_threat_detection(node_id)
+                        trust_score = self._trust_evaluator.evaluate(node_id)
+                        node["trust_score"] = trust_score.score
+                        node["trust_level"] = trust_score.level.name
                         changed = True
                 elif gap > self._heartbeat_interval * 2:
                     if node.get("status") != "degraded":
@@ -231,6 +282,11 @@ class SwarmCoordinator:
                     "events": self._events[-100:],
                 }, f, ensure_ascii=False, default=str)
         except OSError:
+            pass
+        # Persist trust state alongside swarm data
+        try:
+            self._trust_evaluator.save(self._trust_file)
+        except (OSError, ValueError):
             pass
 
     def _load(self):

@@ -29,6 +29,7 @@ _broadcast = None
 _n8n_bridge = None
 _insight = None  # v1.9.0 InsightEngine
 _brain = None    # v1.12.0 CloudBrain LLM analyst
+_topology = None  # v2.1 TopologyManager
 
 
 def set_engines(**kwargs):
@@ -64,6 +65,7 @@ def create_app() -> FastAPI:
     app.state.n8n_bridge = _n8n_bridge
     app.state.insight = _insight
     app.state.brain = _brain
+    app.state.topology = _topology
 
     @app.middleware("http")
     async def cors_middleware(request, call_next):
@@ -91,6 +93,7 @@ def create_app() -> FastAPI:
                 "n8n": "active" if _n8n_bridge else "inactive",
                 "insight": "active" if _insight else "inactive",
                 "brain": "active" if _brain else "inactive",
+                "topology": "active" if _topology else "inactive",
             },
             "edges_online": _swarm.online_count() if _swarm else 0,
         }
@@ -114,6 +117,9 @@ def create_app() -> FastAPI:
     app.include_router(reviews_router, prefix="/api/v1")
     app.include_router(evolution_router, prefix="/api/v1")
     app.include_router(brain_router, prefix="/api/v1")
+
+    from cloud.routers.topology import router as topology_router
+    app.include_router(topology_router, prefix="/api/v1")
 
     # ── v2.0 Auth & Admin Routers ────────────────────
     from cloud.routers.auth import router as auth_router
@@ -143,12 +149,14 @@ def init_engines():
     from cloud.engines.n8n_bridge import N8NBridge
     from cloud.engines.insight import InsightEngine  # v1.9.0
     from cloud.brain.analyst import CloudAnalyst  # v1.12.0
+    from cloud.engines.topology_manager import TopologyManager, TopologyType  # v2.1
 
     global _eventbus, _scheduler, _capability_registry
     global _task_board, _skill_market, _swarm
     global _evolution, _review, _broadcast, _n8n_bridge
     global _insight  # v1.9.0
     global _brain    # v1.12.0
+    global _topology  # v2.1
 
     _eventbus = CloudEventBus(data_dir=config.data_dir)
     _eventbus.start_cleanup_daemon()
@@ -188,7 +196,10 @@ def init_engines():
     _brain = CloudAnalyst(eventbus=_eventbus, data_dir=config.data_dir)
     _brain.start()
 
-    logging.info(f"All 12 engines initialized (v2.0) — Brain LLM: {_brain._llm.is_configured}")
+    # v2.1 — TopologyManager: swarm network topology
+    _topology = TopologyManager(topology_type=TopologyType.MESH)
+
+    logging.info(f"All 13 engines initialized (v2.1) — Brain LLM: {_brain._llm.is_configured}")
 
 
 def init_auth_database():

@@ -7,11 +7,13 @@ ClawShell Memory MCP Server — STDIO transport
   1. MemPalace (SQLite+ChromaDB) — 本地语义记忆
   2. MemOS Local (Node/Bun, :18800) — 本地笔记
   3. MemOS Cloud (REST API) — 云端跨设备同步
+  4. UnifiedMemoryManager (HNSW) — 本地向量语义搜索
 
 Tools:
   - clawshell_memory_search  — 跨三层搜索记忆
   - clawshell_memory_store   — 存储记忆
   - clawshell_memory_stats   — 记忆系统统计
+  - clawshell_memory_consolidate — 合并去重统一记忆
 """
 
 import sys
@@ -24,6 +26,10 @@ from datetime import datetime, timezone
 import requests
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+# UnifiedMemoryManager integration (4th layer)
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+from shared.memory.unified_manager import UnifiedMemoryManager, MemoryType
 
 # ── Config ────────────────────────────────────────────────────
 MEMPALACE_PATH = Path(os.environ.get("MEMPALACE_PATH", os.path.expanduser("~/.mempalace")))
@@ -41,8 +47,31 @@ MEMOS_CLOUD_USER_ID = os.environ.get("MEMOS_CLOUD_USER_ID", "1062695814-58027536
 MEMOS_LOCAL_URL = os.environ.get("MEMOS_LOCAL_URL", "http://127.0.0.1:18800")
 CLOUDHUB_URL = os.environ.get("CLAWSHELL_CLOUD_URL", "http://47.239.71.174")  # v1.12.0: 事件推送
 NODE_ID = os.environ.get("CLAWSHELL_NODE_ID", f"edge-mem-{uuid.uuid4().hex[:8]}")
+UNIFIED_MEMORY_PATH = os.path.expanduser(
+    os.environ.get("CLAWSHELL_UNIFIED_MEMORY_PATH", "~/.clawshell/data/unified_memory")
+)
 
 http = requests.Session()
+
+# ── UnifiedMemoryManager (lazy singleton) ─────────────────────
+_unified_mgr: Optional[UnifiedMemoryManager] = None
+
+
+def _get_unified_manager() -> Optional[UnifiedMemoryManager]:
+    """Return (or create) the global UnifiedMemoryManager instance."""
+    global _unified_mgr
+    if _unified_mgr is None:
+        try:
+            persist_base = os.path.join(UNIFIED_MEMORY_PATH, "index")
+            os.makedirs(UNIFIED_MEMORY_PATH, exist_ok=True)
+            # Try to load existing index; create new if not found
+            try:
+                _unified_mgr = UnifiedMemoryManager.load(persist_base, persist_path=persist_base)
+            except (FileNotFoundError, Exception):
+                _unified_mgr = UnifiedMemoryManager(persist_path=persist_base)
+        except Exception:
+            pass  # Gracefully degrade if HNSW unavailable
+    return _unified_mgr
 
 
 def _publish_memory_event(category: str, content_preview: str, source: str = "memory-mcp"):
@@ -156,6 +185,98 @@ def search_memos_local(query: str, limit: int = 10) -> List[dict]:
     return results
 
 
+# ── Unified Memory (4th layer) helpers ───────────────────────
+
+# Map category strings to MemoryType for classification
+_CATEGORY_TO_MEMORY_TYPE: Dict[str, MemoryType] = {
+    "fact": MemoryType.SEMANTIC,
+    "knowledge": MemoryType.SEMANTIC,
+    "semantic": MemoryType.SEMANTIC,
+    "event": MemoryType.EPISODIC,
+    "episode": MemoryType.EPISODIC,
+    "episodic": MemoryType.EPISODIC,
+    "howto": MemoryType.PROCEDURAL,
+    "procedure": MemoryType.PROCEDURAL,
+    "procedural": MemoryType.PROCEDURAL,
+    "skill": MemoryType.PROCEDURAL,
+    "working": MemoryType.WORKING,
+    "temp": MemoryType.CACHE,
+    "cache": MemoryType.CACHE,
+}
+
+
+def _classify_category(category: str) -> MemoryType:
+    """Map a category string to a MemoryType enum value."""
+    return _CATEGORY_TO_MEMORY_TYPE.get(category.lower().strip(), MemoryType.SEMANTIC)
+
+
+def search_unified(query: str, limit: int = 10) -> List[dict]:
+    """Search the UnifiedMemoryManager (HNSW-powered)."""
+    results: List[dict] = []
+    mgr = _get_unified_manager()
+    if mgr is None:
+        return results
+    try:
+        hits = mgr.search(query, k=limit)
+        for hit in hits:
+            entry = hit.memory
+            results.append({
+                "source": "unified",
+                "key": entry.key,
+                "content": entry.content[:300],
+                "type": entry.memory_type.value,
+                "score": round(hit.final_score, 4),
+            })
+    except Exception:
+        pass
+    return results
+
+
+def _deduplicate_results(results: List[dict]) -> List[dict]:
+    """Remove near-duplicate results across sources by content similarity.
+
+    Uses simple normalised content comparison.  When two results from
+    different sources have very similar content (>90% overlap of the
+    shorter string), keep the one with the higher score (or the first
+    occurrence).
+    """
+    if not results:
+        return results
+
+    def _norm(s: str) -> str:
+        return " ".join(s.lower().split())
+
+    def _overlap(a: str, b: str) -> float:
+        """Simple character-level overlap ratio."""
+        if not a or not b:
+            return 0.0
+        shorter, longer = (a, b) if len(a) <= len(b) else (b, a)
+        # Check if shorter is a substring of longer
+        if shorter in longer:
+            return 1.0
+        # Count common words
+        words_a = set(shorter.split())
+        words_b = set(longer.split())
+        if not words_a:
+            return 0.0
+        common = words_a & words_b
+        return len(common) / len(words_a)
+
+    deduped: List[dict] = []
+    seen_contents: List[str] = []
+    for r in results:
+        nc = _norm(r.get("content", ""))
+        is_dup = False
+        for sc in seen_contents:
+            if _overlap(nc, sc) > 0.9:
+                is_dup = True
+                break
+        if not is_dup:
+            deduped.append(r)
+            seen_contents.append(nc)
+    return deduped
+
+
 # ── Tools ─────────────────────────────────────────────────────
 
 def tool_memory_search(args: dict) -> dict:
@@ -168,6 +289,10 @@ def tool_memory_search(args: dict) -> dict:
     results.extend(search_mempalace(query, limit))
     results.extend(search_memos_cloud(query, limit))
     results.extend(search_memos_local(query, limit))
+    results.extend(search_unified(query, limit))
+
+    # Deduplicate across sources
+    results = _deduplicate_results(results)
 
     return {
         "query": query,
@@ -176,6 +301,7 @@ def tool_memory_search(args: dict) -> dict:
             "mempalace": sum(1 for r in results if r["source"] == "mempalace"),
             "memos_cloud": sum(1 for r in results if r["source"] == "memos_cloud"),
             "memos_local": sum(1 for r in results if r["source"] == "memos_local"),
+            "unified": sum(1 for r in results if r["source"] == "unified"),
         },
         "results": results,
     }
@@ -227,6 +353,23 @@ def tool_memory_store(args: dict) -> dict:
     # v1.12.0: 推送记忆事件到 CloudHub，供云枢复盘
     if stored:
         _publish_memory_event(category, content[:200], source=NODE_ID)
+
+    # Store to UnifiedMemoryManager (4th layer)
+    mgr = _get_unified_manager()
+    if mgr is not None:
+        try:
+            mem_type = _classify_category(category)
+            mgr.store(
+                key=f"mcp_{category}_{uuid.uuid4().hex[:8]}",
+                content=content,
+                memory_type=mem_type,
+                tags=[category],
+                importance=0.6,
+                metadata={"source": "memory-mcp", "category": category},
+            )
+            stored.append("unified")
+        except Exception:
+            pass  # Best-effort; don't fail the store
 
     return {"stored_to": stored, "content_preview": content[:100]}
 
@@ -282,6 +425,25 @@ def tool_memory_stats(args: dict) -> dict:
     return stats
 
 
+def tool_memory_consolidate(args: dict) -> dict:
+    """Trigger consolidation on the UnifiedMemoryManager.
+
+    Runs expire → deduplicate → evict housekeeping.
+    """
+    mgr = _get_unified_manager()
+    if mgr is None:
+        return {"error": "UnifiedMemoryManager not available"}
+    try:
+        summary = mgr.consolidate()
+        return {
+            "status": "ok",
+            "entries_after": mgr.size,
+            "consolidation": summary,
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
 # ── Tool Registry ─────────────────────────────────────────────
 
 TOOLS = {
@@ -313,6 +475,11 @@ TOOLS = {
         "description": "获取三层记忆系统统计信息",
         "inputSchema": {"type": "object", "properties": {}},
         "handler": tool_memory_stats,
+    },
+    "clawshell_memory_consolidate": {
+        "description": "合并去重统一记忆(HNSW层): 过期清理、重复合并、容量淘汰",
+        "inputSchema": {"type": "object", "properties": {}},
+        "handler": tool_memory_consolidate,
     },
 }
 

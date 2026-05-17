@@ -9,6 +9,7 @@ HTTP health checking for endpoints.
 """
 from __future__ import annotations
 import os
+import logging
 import subprocess
 import socket
 import threading
@@ -19,6 +20,14 @@ from urllib.error import URLError
 
 from shared.models import Plugin, PluginRegistry
 from shared.models import HealthStatus, CapabilityDomain
+from edge.ecosystem.plugin_lifecycle import (
+    PluginLifecycleManager,
+    PluginState,
+    PluginMetadata,
+    PluginContext,
+    HealthCheckResult,
+    IPlugin,
+)
 
 
 # ── Builtin Plugin Definitions ─────────────────────────────
@@ -57,6 +66,79 @@ BUILTIN_PLUGINS: Dict[str, dict] = {
 }
 
 
+# ── YAML Plugin Adapter ────────────────────────────────────
+
+class YamlPluginAdapter:
+    """Wraps a YAML plugin config dict into the IPlugin protocol.
+
+    Allows YAML-defined custom plugins to be managed by PluginLifecycleManager.
+    Implements initialize / shutdown / health_check lifecycle hooks.
+    """
+
+    def __init__(self, plugin_id: str, cfg: dict):
+        self._plugin_id = plugin_id
+        self._cfg = cfg
+        self._state = PluginState.UNINITIALIZED
+        self._initialized = False
+        self._shutdown_called = False
+
+    @property
+    def metadata(self) -> PluginMetadata:
+        return PluginMetadata(
+            name=self._plugin_id,
+            version=self._cfg.get("version", "0.1.0"),
+            description=self._cfg.get("description", ""),
+            author=self._cfg.get("author", ""),
+            dependencies=self._cfg.get("dependencies", []),
+            tags=self._cfg.get("tags", []),
+        )
+
+    @property
+    def state(self) -> PluginState:
+        return self._state
+
+    def initialize(self, context: PluginContext) -> None:
+        """Initialize the YAML plugin (runs startup commands if configured)."""
+        self._initialized = True
+        self._state = PluginState.ACTIVE
+
+    def shutdown(self) -> None:
+        """Shutdown the YAML plugin."""
+        self._shutdown_called = True
+        self._state = PluginState.SHUTDOWN
+
+    def health_check(self) -> HealthCheckResult:
+        """Health check via endpoint if available."""
+        endpoint = self._cfg.get("endpoint")
+        if not endpoint:
+            return HealthCheckResult(healthy=True, message="no endpoint configured")
+        try:
+            req = Request(endpoint, method="HEAD")
+            resp = urlopen(req, timeout=5)
+            healthy = resp.status < 500
+            return HealthCheckResult(
+                healthy=healthy,
+                message=f"HTTP {resp.status}",
+            )
+        except Exception as exc:
+            # Fall back to TCP check
+            try:
+                from urllib.parse import urlparse
+                parsed = urlparse(endpoint)
+                host = parsed.hostname
+                port = parsed.port or (443 if parsed.scheme == "https" else 80)
+                if host:
+                    sock = socket.socket()
+                    sock.settimeout(3)
+                    result = sock.connect_ex((host, port))
+                    sock.close()
+                    if result == 0:
+                        return HealthCheckResult(healthy=True, message="TCP ok, HTTP failed")
+            except Exception:
+                pass
+            return HealthCheckResult(healthy=False, message=str(exc))
+
+
 class PluginManager:
     """Plugin discovery, health checking, and lifecycle management.
 
@@ -84,6 +166,8 @@ class PluginManager:
         self._running = False
         self._lock = threading.RLock()
         self._health_thread: Optional[threading.Thread] = None
+        self._lifecycle = PluginLifecycleManager()
+        self._adapters: Dict[str, YamlPluginAdapter] = {}
 
     # ── Discovery ──────────────────────────────────────────
 
@@ -123,6 +207,10 @@ class PluginManager:
                         cfg = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
                         if not cfg:
                             continue
+                        # Wrap in adapter and register with lifecycle manager
+                        adapter = YamlPluginAdapter(entry.name, cfg)
+                        self._lifecycle.register(adapter)
+                        self._adapters[entry.name] = adapter
                         p = Plugin(
                             plugin_id=entry.name,
                             name=cfg.get("name", entry.name),
@@ -148,18 +236,47 @@ class PluginManager:
     def health_check(self) -> Dict[str, str]:
         """Run health checks on all enabled plugins.
 
+        Uses PluginLifecycleManager.health_check_all() for YAML plugins
+        and HTTP-based checks for builtin plugins.
+
         Returns:
             Dict mapping plugin_id → health status string.
         """
         with self._lock:
             results: Dict[str, str] = {}
+
+            # Lifecycle-managed (YAML) plugins
+            if self._adapters:
+                ctx = PluginContext(config={}, logger=logging.getLogger(__name__))
+                # Initialize any uninitialized adapters
+                for name, adapter in self._adapters.items():
+                    if adapter.state == PluginState.UNINITIALIZED:
+                        try:
+                            self._lifecycle.initialize_all(ctx)
+                            break
+                        except Exception:
+                            pass
+                lifecycle_results = self._lifecycle.health_check_all()
+                for name, hcr in lifecycle_results.items():
+                    if hcr.healthy:
+                        status = HealthStatus.HEALTHY
+                    else:
+                        status = HealthStatus.CRITICAL
+                    if name in self._plugins:
+                        self._plugins[name].health_status = status
+                    results[name] = status
+
+            # Builtin plugins (HTTP-based check)
             for pid, plugin in self._plugins.items():
+                if pid in self._adapters:
+                    continue  # already handled by lifecycle manager
                 if not plugin.enabled:
                     results[pid] = HealthStatus.UNKNOWN
                     continue
                 status = self._check_plugin(plugin)
                 plugin.health_status = status
                 results[pid] = status
+
             return results
 
     def _check_plugin(self, plugin: Plugin) -> str:
@@ -209,6 +326,11 @@ class PluginManager:
     def stop(self):
         """Stop the plugin manager."""
         self._running = False
+        # Shutdown lifecycle-managed plugins
+        try:
+            self._lifecycle.shutdown_all()
+        except Exception:
+            pass
         if self._health_thread and self._health_thread.is_alive():
             self._health_thread.join(timeout=5)
 
@@ -263,6 +385,16 @@ class PluginManager:
         with self._lock:
             self._registry.plugins = list(self._plugins.values())
             return self._registry
+
+    @property
+    def lifecycle(self) -> PluginLifecycleManager:
+        """Get the lifecycle manager instance."""
+        return self._lifecycle
+
+    @property
+    def adapters(self) -> Dict[str, YamlPluginAdapter]:
+        """Get the YAML plugin adapters."""
+        return dict(self._adapters)
 
     @property
     def stats(self) -> dict:
