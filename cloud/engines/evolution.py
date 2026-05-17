@@ -165,6 +165,14 @@ class EvolutionEngine:
         self._publisher = AutoSkillPublisher(skill_market)
         self._tracker = EvolutionTracker()
 
+        # v1.10.0: Wire GitHubAdapter for PR-based insights (graceful fallback)
+        self._github = None
+        try:
+            from cloud.adapters.github import GitHubAdapter
+            self._github = GitHubAdapter()
+        except ImportError:
+            pass
+
         self._running = False
         self._thread: Optional[threading.Thread] = None
 
@@ -186,12 +194,20 @@ class EvolutionEngine:
         return self._tracker.get_history(limit=limit)
 
     def get_stats(self) -> dict:
-        return {
+        base = {
             "total_insights": self._aggregator.total(),
             "patterns_found": len(self._miner.get_patterns()),
             "auto_published": len(self._publisher._published),
             "history_entries": len(self._tracker.get_history()),
         }
+        if self._github is not None:
+            base["github_configured"] = self._github.is_configured
+        return base
+
+    @property
+    def github(self):
+        """Access the GitHubAdapter (or None if unavailable)."""
+        return self._github
 
     def run_cycle(self):
         """Execute one evolution cycle (called by daemon)."""
@@ -209,6 +225,23 @@ class EvolutionEngine:
             for p in patterns:
                 if p.get("occurrences", 0) >= 3:
                     self._publisher.publish_pattern(p)
+
+            # 4. v1.10.0: GitHub-based insights
+            if self._github is not None and self._github.is_configured:
+                try:
+                    issues = self._github.list_issues(state="open", limit=5)
+                    for issue in issues:
+                        title = issue.get("title", "")
+                        if title:
+                            self._aggregator.add_insight(
+                                title=f"GitHub Issue: {title}",
+                                content=issue.get("body", "")[:500],
+                                category="github",
+                                source_edges=["github"],
+                                confidence=0.6,
+                            )
+                except Exception:
+                    pass
 
             self._tracker.record("cycle_completed", {"patterns_found": len(patterns)})
 

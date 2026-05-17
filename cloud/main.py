@@ -29,14 +29,17 @@ _broadcast = None
 _n8n_bridge = None
 _insight = None  # v1.9.0 InsightEngine
 _brain = None    # v1.12.0 CloudBrain LLM analyst
-_topology = None  # v2.1 TopologyManager
-
+_optimizer = None      # v1.8.1 GlobalOptimizer
+_deep_think = None     # v1.8.1 DeepThinkEngine
+_workflow = None       # v1.8.1 WorkflowEngine
+_knowledge_graph = None  # v1.8.1 KnowledgeGraph
+_pubsub = None         # v1.9.0 PubSubManager
+_topology = None       # v2.1.0 TopologyManager
 
 def set_engines(**kwargs):
     """Inject engine instances."""
     for name, engine in kwargs.items():
         globals()[f"_{name}"] = engine
-
 
 # ── App Factory ────────────────────────────────────────
 
@@ -65,7 +68,11 @@ def create_app() -> FastAPI:
     app.state.n8n_bridge = _n8n_bridge
     app.state.insight = _insight
     app.state.brain = _brain
-    app.state.topology = _topology
+    app.state.optimizer = _optimizer
+    app.state.deep_think = _deep_think
+    app.state.workflow = _workflow
+    app.state.knowledge_graph = _knowledge_graph
+    app.state.pubsub = _pubsub
 
     @app.middleware("http")
     async def cors_middleware(request, call_next):
@@ -93,6 +100,11 @@ def create_app() -> FastAPI:
                 "n8n": "active" if _n8n_bridge else "inactive",
                 "insight": "active" if _insight else "inactive",
                 "brain": "active" if _brain else "inactive",
+                "optimizer": "active" if _optimizer else "inactive",
+                "deep_think": "active" if _deep_think else "inactive",
+                "workflow": "active" if _workflow else "inactive",
+                "knowledge_graph": "active" if _knowledge_graph else "inactive",
+                "pubsub": "active" if _pubsub else "inactive",
                 "topology": "active" if _topology else "inactive",
             },
             "edges_online": _swarm.online_count() if _swarm else 0,
@@ -118,9 +130,6 @@ def create_app() -> FastAPI:
     app.include_router(evolution_router, prefix="/api/v1")
     app.include_router(brain_router, prefix="/api/v1")
 
-    from cloud.routers.topology import router as topology_router
-    app.include_router(topology_router, prefix="/api/v1")
-
     # ── v2.0 Auth & Admin Routers ────────────────────
     from cloud.routers.auth import router as auth_router
     from cloud.routers.admin import router as admin_router
@@ -130,8 +139,15 @@ def create_app() -> FastAPI:
     app.include_router(admin_router, prefix="/api/v1")
     app.include_router(credentials_router, prefix="/api/v1")
 
-    return app
+    # ── v1.8.1/v1.9.0 Engines Router ───────────────
+    from cloud.routers.engines import router as engines_router
+    app.include_router(engines_router, prefix="/api/v1")
 
+    # ── v2.1 Topology Router ───────────────────────
+    from cloud.routers.topology import router as topology_router
+    app.include_router(topology_router, prefix="/api/v1")
+
+    return app
 
 # ── Startup ────────────────────────────────────────────
 
@@ -149,14 +165,19 @@ def init_engines():
     from cloud.engines.n8n_bridge import N8NBridge
     from cloud.engines.insight import InsightEngine  # v1.9.0
     from cloud.brain.analyst import CloudAnalyst  # v1.12.0
-    from cloud.engines.topology_manager import TopologyManager, TopologyType  # v2.1
+    from cloud.engines.optimizer import GlobalOptimizer  # v1.8.1
+    from cloud.engines.deep_think import DeepThinkEngine  # v1.8.1
+    from cloud.engines.workflow import WorkflowEngine  # v1.8.1
+    from cloud.services.knowledge_graph import KnowledgeGraph  # v1.8.1
 
     global _eventbus, _scheduler, _capability_registry
     global _task_board, _skill_market, _swarm
     global _evolution, _review, _broadcast, _n8n_bridge
     global _insight  # v1.9.0
     global _brain    # v1.12.0
-    global _topology  # v2.1
+    global _optimizer, _deep_think, _workflow  # v1.8.1
+    global _knowledge_graph  # v1.8.1
+    global _pubsub  # v1.9.0
 
     _eventbus = CloudEventBus(data_dir=config.data_dir)
     _eventbus.start_cleanup_daemon()
@@ -188,26 +209,33 @@ def init_engines():
 
     _n8n_bridge = N8NBridge(n8n_base_url=config.n8n_url)
 
-    # v1.9.0 — InsightEngine: real-time event analysis
-    _insight = InsightEngine(eventbus=_eventbus, data_dir=config.data_dir)
+    # v1.8.1 — New engines
+    _optimizer = GlobalOptimizer()
+    _deep_think = DeepThinkEngine()
+    _workflow = WorkflowEngine(store_dir=os.path.join(config.data_dir, "workflows"))
+    _knowledge_graph = KnowledgeGraph(store_dir=os.path.join(config.data_dir, "knowledge_graph"))
+
+    # v1.9.0 — PubSubManager: use EventBus's built-in instance
+    _pubsub = _eventbus._pubsub
+    if _pubsub:
+        _pubsub.start_cleanup()
+
+    # v1.9.0 — InsightEngine: real-time event analysis (with KnowledgeGraph)
+    _insight = InsightEngine(eventbus=_eventbus, data_dir=config.data_dir,
+                             knowledge_graph=_knowledge_graph)
     _insight.start()
 
     # v1.12.0 — CloudBrain: LLM-powered analysis (event-driven + periodic)
     _brain = CloudAnalyst(eventbus=_eventbus, data_dir=config.data_dir)
     _brain.start()
 
-    # v2.1 — TopologyManager: swarm network topology
-    _topology = TopologyManager(topology_type=TopologyType.MESH)
-
-    logging.info(f"All 13 engines initialized (v2.1) — Brain LLM: {_brain._llm.is_configured}")
-
+    logging.info(f"All 18 engines initialized (v2.1) — Brain LLM: {_brain._llm.is_configured}")
 
 def init_auth_database():
     """Initialize the v2.0 auth database (SQLite WAL)."""
     from cloud.auth.database import init_database
     init_database()
     logging.info("Auth database initialized (v2.0)")
-
 
 def main():
     """Entry point: clawshell-cloud"""
@@ -222,7 +250,6 @@ def main():
 
     logging.info(f"Cloud Hub starting on {config.host}:{config.port}")
     uvicorn.run(app, host=config.host, port=config.port, log_level="info")
-
 
 if __name__ == "__main__":
     main()

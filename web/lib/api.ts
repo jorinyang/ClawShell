@@ -131,6 +131,15 @@ export const api = {
   updateEndpoint: (id: string, data: { enabled?: boolean; config?: any }) =>
     request<any>(`/admin/endpoints/${id}`, { method: "PUT", body: JSON.stringify(data) }),
 
-  // My Credentials
+  // My Credentials (typed)
   getMyCredentials: () => request<any[]>("/credentials"),
+
+  createCredential: (data: any) =>
+    request<any>("/credentials", { method: "POST", body: JSON.stringify(data) }),
+
+  updateCredential: (id: string, data: any) =>
+    request<any>(`/credentials/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+
+  deleteCredential: (id: string) =>
+    request<any>(`/credentials/${id}`, { method: "DELETE" }),
 };

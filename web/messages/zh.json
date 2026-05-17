@@ -109,15 +109,38 @@
     "title": "凭证管理",
     "name": "名称",
     "type": "类型",
+    "service": "服务",
+    "description": "描述",
     "username": "用户名",
     "host": "主机",
     "port": "端口",
+    "apiKey": "API Key",
+    "baseUrl": "Base URL",
+    "model": "模型",
+    "accessKeyId": "Access Key ID",
+    "accessKeySecret": "Access Key Secret",
     "shared": "共享凭证",
     "myCredentials": "我的凭证",
     "addCredential": "添加凭证",
     "editCredential": "编辑凭证",
     "deleteCredential": "删除凭证",
-    "confirmDelete": "确定要删除此凭证吗？"
+    "confirmDelete": "确定要删除此凭证吗？",
+    "types": {
+      "api-key": "API Key",
+      "access-key": "Access Key",
+      "token-plan": "Token Plan",
+      "legacy": "旧版"
+    },
+    "placeholders": {
+      "name": "例如: DeepSeek API",
+      "service": "例如: deepseek, openai",
+      "apiKey": "sk-...",
+      "baseUrl": "https://api.deepseek.com",
+      "model": "例如: deepseek-chat",
+      "accessKeyId": "LTAI5t...",
+      "accessKeySecret": "请输入 Access Key Secret",
+      "description": "可选描述"
+    }
   },
   "endpoints": {
     "title": "端点配置",

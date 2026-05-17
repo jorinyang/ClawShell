@@ -42,6 +42,18 @@ class EdgeEventTracer:
                 return self._spans[span_id]
             return None
 
+    def get_trace(self, trace_id: str) -> TraceResult:
+        """Get all spans for a given trace_id."""
+        with self._lock:
+            span_ids = self._traces.get(trace_id, [])
+            spans = [self._spans[sid] for sid in span_ids if sid in self._spans]
+            return TraceResult(
+                trace_id=trace_id,
+                spans=spans,
+                total_spans=len(spans),
+                error_spans=sum(1 for s in spans if s.status == "error"),
+            )
+
     def get_stats(self) -> Dict[str, Any]:
         with self._lock:
             return {"total_spans": len(self._spans), "total_traces": len(self._traces)}

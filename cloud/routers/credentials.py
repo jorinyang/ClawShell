@@ -41,10 +41,19 @@ async def list_credentials(request: Request):
     return CredentialService.get_user_credentials(payload["sub"])
 
 
+@router.get("/sync")
+async def sync_credentials(request: Request):
+    payload = _require_auth(request)
+    return CredentialService.sync_credentials(payload["sub"])
+
+
 @router.put("/{cred_id}", response_model=CredentialResponse)
 async def update_credential(cred_id: str, data: CredentialUpdate, request: Request):
     payload = _require_auth(request)
-    cred = CredentialService.update_credential(cred_id, payload["sub"], data)
+    try:
+        cred = CredentialService.update_credential(cred_id, payload["sub"], data)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Credential not found")
     if not cred:
         raise HTTPException(status_code=404, detail="Credential not found")
     AuditService.log(payload["sub"], "cred_update", target=cred_id, ip=_get_client_ip(request))
@@ -54,14 +63,6 @@ async def update_credential(cred_id: str, data: CredentialUpdate, request: Reque
 @router.delete("/{cred_id}")
 async def delete_credential(cred_id: str, request: Request):
     payload = _require_auth(request)
-    ok = CredentialService.delete_credential(cred_id, payload["sub"])
-    if not ok:
-        raise HTTPException(status_code=404, detail="Credential not found")
+    CredentialService.delete_credential(cred_id, payload["sub"])
     AuditService.log(payload["sub"], "cred_delete", target=cred_id, ip=_get_client_ip(request))
     return {"status": "ok", "message": "Credential deleted"}
-
-
-@router.get("/sync")
-async def sync_credentials(request: Request):
-    payload = _require_auth(request)
-    return CredentialService.sync_credentials(payload["sub"])

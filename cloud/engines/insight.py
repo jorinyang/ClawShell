@@ -41,15 +41,17 @@ class InsightEngine:
     SUMMARY_INTERVAL = 300           # 5 minutes
     ANALYSIS_INTERVAL = 30           # 30 seconds between analysis cycles
 
-    def __init__(self, eventbus=None, data_dir: str = "data"):
+    def __init__(self, eventbus=None, data_dir: str = "data", knowledge_graph=None):
         """Initialize InsightEngine.
 
         Args:
             eventbus: CloudEventBus or LocalEventBus instance for event access
             data_dir: Directory for persistent storage
+            knowledge_graph: Optional KnowledgeGraph instance for entity/relation storage
         """
         self._eventbus = eventbus
         self._data_dir = data_dir
+        self._knowledge_graph = knowledge_graph
         self._insights_dir = os.path.join(data_dir, "insights")
         os.makedirs(self._insights_dir, exist_ok=True)
 
@@ -260,7 +262,7 @@ class InsightEngine:
     # ── Publish ───────────────────────────────────────────────
 
     def _publish_insight(self, insight: Insight):
-        """Publish an insight to the EventBus."""
+        """Publish an insight to the EventBus and store in KnowledgeGraph."""
         if not self._eventbus:
             return
 
@@ -283,6 +285,9 @@ class InsightEngine:
         except Exception:
             pass  # EventBus may not be ready
 
+        # Store insight as entity in KnowledgeGraph
+        self._store_in_knowledge_graph(insight)
+
         # Also persist locally
         self._save_insight(insight)
 
@@ -294,6 +299,48 @@ class InsightEngine:
                 f.write(insight.model_dump_json(indent=2))
         except Exception:
             pass
+
+    def _store_in_knowledge_graph(self, insight: Insight):
+        """Store insight entities and relations in the KnowledgeGraph."""
+        if not self._knowledge_graph:
+            return
+        try:
+            from cloud.services.knowledge_graph import Entity, Relation
+            # Create entity for the insight
+            entity = Entity(
+                entity_id=insight.insight_id,
+                name=insight.title,
+                entity_type="insight",
+                description=insight.content,
+                tags=insight.tags or [insight.category],
+                properties={
+                    "category": insight.category,
+                    "severity": str(insight.severity),
+                    "actionable": insight.actionable,
+                    "source_node": insight.source_node,
+                },
+            )
+            self._knowledge_graph.add_entity(entity)
+
+            # If there's an action target, create a relation
+            if insight.action and isinstance(insight.action, dict):
+                target = insight.action.get("target") or insight.action.get("targets")
+                if target:
+                    target_name = target if isinstance(target, str) else str(target)
+                    # Check if target entity exists or create one
+                    existing = self._knowledge_graph.find_entities(
+                        entity_type="node", tags=[target_name]
+                    )
+                    if existing:
+                        rel = Relation(
+                            source_id=insight.insight_id,
+                            target_id=existing[0].entity_id,
+                            relation_type="insight_about",
+                            weight=0.8,
+                        )
+                        self._knowledge_graph.add_relation(rel)
+        except Exception:
+            pass  # Don't let KG errors break insight generation
 
     # ── Query ─────────────────────────────────────────────────
 

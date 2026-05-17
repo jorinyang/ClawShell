@@ -60,6 +60,14 @@ class CloudEventBus:
         self._subscribers: dict = defaultdict(list)
         self._ttl_enabled: bool = True
 
+        # v1.10.0 PubSubManager integration (graceful fallback)
+        self._pubsub = None
+        try:
+            from cloud.pubsub.manager import PubSubManager
+            self._pubsub = PubSubManager(eventbus=self)
+        except ImportError:
+            pass
+
         # Daemon control
         self._running = False
         self._cleanup_thread: Optional[threading.Thread] = None
@@ -68,6 +76,11 @@ class CloudEventBus:
         self._load_all()
 
     # ── Public API ────────────────────────────────
+
+    @property
+    def pubsub(self):
+        """Access the PubSubManager (or None if unavailable)."""
+        return self._pubsub
 
     def ingest(self, events: List[dict]) -> int:
         """Ingest a batch of events. Returns count of NEW events accepted."""
@@ -129,6 +142,16 @@ class CloudEventBus:
                     priority = evt.get("priority", 50)
                     ts = evt.get("timestamp", time.time())
                     heapq.heappush(self._priority_queue, (-priority, ts, eid))
+
+                # v1.10.0: Publish accepted events via PubSubManager
+                if self._pubsub is not None:
+                    for eid in list(self._events.keys())[-accepted:]:
+                        evt = self._events.get(eid)
+                        if evt:
+                            try:
+                                self._pubsub.publish(evt)
+                            except Exception:
+                                pass  # graceful fallback
 
             return accepted
 

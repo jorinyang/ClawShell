@@ -166,6 +166,14 @@ def cmd_status(args):
     except Exception:
         pass
 
+    # Exoskeleton Daemon status
+    try:
+        from edge.exoskeleton_daemon import ExoskeletonDaemon
+        exo = ExoskeletonDaemon.__new__(ExoskeletonDaemon)
+        print("  Exoskeleton: available (start with 'clawshell start')")
+    except Exception:
+        print("  Exoskeleton: not available")
+
 
 def cmd_start(args):
     """Start the Edge Sync Daemon."""
@@ -193,13 +201,20 @@ def cmd_start(args):
     )
     daemon.start()
 
+    # Start Exoskeleton Daemon (activates all exoskeleton layers + gateway)
+    from edge.exoskeleton_daemon import ExoskeletonDaemon
+    exo_daemon = ExoskeletonDaemon(interval=30)
+    exo_daemon.start()
+
     print(f"✅ Edge Sync Daemon started (node: {config.get('node_id', 'unknown')})")
+    print(f"🦾 Exoskeleton Daemon started (interval: 30s)")
     print("   Press Ctrl+C to stop...")
 
     try:
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
+        exo_daemon.stop()
         daemon.shutdown()
         print("\n🛑 Daemon stopped.")
 
@@ -207,7 +222,8 @@ def cmd_start(args):
 def cmd_stop(args):
     """Stop the Edge Sync Daemon."""
     print("🛑 Stopping ClawShell Edge...")
-    print("   Daemon will exit on next cycle.")
+    print("   Sync Daemon will exit on next cycle.")
+    print("   Exoskeleton Daemon will exit on next cycle.")
 
 
 def cmd_sync(args):

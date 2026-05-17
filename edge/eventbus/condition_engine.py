@@ -68,6 +68,28 @@ class ConditionEngine:
                         except Exception: pass
         return triggered
 
+    def evaluate(self, event: dict) -> tuple:
+        """Evaluate all conditions against an event's data.
+
+        Args:
+            event: Event dict with 'data' field containing metric values.
+
+        Returns:
+            (allowed, blocked_by): allowed is True if no conditions triggered.
+            blocked_by is a list of condition names that triggered (blocked).
+        """
+        blocked = []
+        data = event.get("data") or {}
+        if not isinstance(data, dict):
+            return True, []
+        with self._lock:
+            for cond in self._conditions.values():
+                value = data.get(cond.metric)
+                if value is not None and isinstance(value, (int, float)):
+                    if cond.evaluate(float(value)):
+                        blocked.append(cond.name)
+        return len(blocked) == 0, blocked
+
     def get_stats(self) -> Dict[str, Any]:
         with self._lock:
             return {"condition_count": len(self._conditions), "tracked_metrics": len(self._metric_values)}
