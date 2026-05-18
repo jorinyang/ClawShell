@@ -110,7 +110,7 @@ export const api = {
     request<any>(`/admin/shared-credentials/${id}`, { method: "DELETE" }),
 
   // Nodes
-  getNodes: () => request<any[]>("/admin/nodes"),
+  getNodes: () => request<{ nodes: any[]; count: number }>("/admin/nodes").then(d => d.nodes),
 
   updateNode: (id: string, data: any) =>
     request<any>(`/admin/nodes/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
