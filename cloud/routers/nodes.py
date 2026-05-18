@@ -20,8 +20,12 @@ from shared.protocol import format_api_response
 router = APIRouter(tags=["nodes"])
 
 
-def _get_registry():
-    """Get CapabilityRegistry from the running main module."""
+def _get_registry(request: Request = None):
+    """Get CapabilityRegistry — app.state first, then module global fallback."""
+    if request:
+        reg = getattr(request.app.state, 'capability_registry', None)
+        if reg:
+            return reg
     import sys
     main_mod = sys.modules.get('cloud.main') or sys.modules.get('__main__')
     reg = getattr(main_mod, '_capability_registry', None) if main_mod else None
@@ -30,9 +34,15 @@ def _get_registry():
     return reg
 
 
-def _get_topology():
-    """Get TopologyManager (optional, may not exist)."""
-    return getattr(__import__('cloud.main', fromlist=['_topology']), '_topology', None)
+def _get_topology(request: Request = None):
+    """Get TopologyManager (optional, may not exist) — app.state first."""
+    if request:
+        topo = getattr(request.app.state, 'topology', None)
+        if topo:
+            return topo
+    import sys
+    mod = sys.modules.get('__main__') or sys.modules.get('cloud.main')
+    return getattr(mod, '_topology', None) if mod else None
 
 
 def _extract_user_id(request: Request) -> str:
@@ -126,11 +136,11 @@ async def register_node(request: Request):
     # Try to extract user_id from JWT (backward compatible — no auth required)
     user_id = _extract_user_id(request)
 
-    registry = _get_registry()
+    registry = _get_registry(request)
     try:
         nid = registry.register(body)
         # Auto-register in TopologyManager
-        topology = _get_topology()
+        topology = _get_topology(request)
         if topology:
             try:
                 topology.add_node(
@@ -158,7 +168,7 @@ async def node_heartbeat(node_id: str, request: Request):
     except Exception:
         body = {}
 
-    registry = _get_registry()
+    registry = _get_registry(request)
     metrics = body.get("metrics") if body else None
     ok = registry.heartbeat(node_id, metrics)
     if not ok:
@@ -172,25 +182,26 @@ async def node_heartbeat(node_id: str, request: Request):
 
 @router.get("/nodes/")
 async def list_nodes(
+    request: Request,
     status: Optional[str] = Query(None),
 ):
     """List registered nodes."""
-    registry = _get_registry()
+    registry = _get_registry(request)
     nodes = registry.list_nodes(status=status)
     return format_api_response(True, data={"nodes": nodes, "count": len(nodes)})
 
 
 @router.get("/nodes/online")
-async def online_count():
+async def online_count(request: Request):
     """Count online nodes."""
-    registry = _get_registry()
+    registry = _get_registry(request)
     return format_api_response(True, data={"online": registry.online_count()})
 
 
 @router.get("/nodes/{node_id}")
-async def get_node(node_id: str):
+async def get_node(node_id: str, request: Request):
     """Get node details."""
-    registry = _get_registry()
+    registry = _get_registry(request)
     node = registry.get_node(node_id)
     if not node:
         return format_api_response(False, error=f"Node '{node_id}' not found")
@@ -198,13 +209,13 @@ async def get_node(node_id: str):
 
 
 @router.delete("/nodes/{node_id}")
-async def deregister_node(node_id: str):
+async def deregister_node(node_id: str, request: Request):
     """Deregister a node."""
-    registry = _get_registry()
+    registry = _get_registry(request)
     ok = registry.deregister(node_id)
     # Also remove from topology
     if ok:
-        topology = _get_topology()
+        topology = _get_topology(request)
         if topology:
             try:
                 topology.remove_node(node_id)
@@ -237,7 +248,7 @@ async def health_report(request: Request):
         return format_api_response(False, error="Invalid JSON body")
 
     node_id = body.get("node_id", "")
-    registry = _get_registry()
+    registry = _get_registry(request)
 
     metrics = body.get("metrics", {})
     frameworks = body.get("frameworks", None)

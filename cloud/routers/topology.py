@@ -18,8 +18,14 @@ from shared.protocol import format_api_response
 router = APIRouter(tags=["topology"])
 
 
-def _get_topology():
-    """Get TopologyManager from global engine reference."""
+def _get_topology(request: Request = None):
+    """Get TopologyManager — app.state first, then module global fallback."""
+    # Try app.state first (works in tests and production)
+    if request:
+        topo = getattr(request.app.state, 'topology', None)
+        if topo:
+            return topo
+    # Fallback to module global
     import sys
     mod = sys.modules.get('__main__') or sys.modules.get('cloud.main')
     topo = getattr(mod, '_topology', None) if mod else None
@@ -31,9 +37,9 @@ def _get_topology():
 # ── Topology State ────────────────────────────────────
 
 @router.get("/topology")
-async def get_topology():
+async def get_topology(request: Request):
     """Return the full current topology state (nodes, edges, partitions)."""
-    topology = _get_topology()
+    topology = _get_topology(request)
     state = topology.get_topology_state()
     return format_api_response(True, data={
         "topology_type": state.topology_type,
@@ -48,9 +54,9 @@ async def get_topology():
 # ── Nodes ─────────────────────────────────────────────
 
 @router.get("/topology/nodes")
-async def list_topology_nodes():
+async def list_topology_nodes(request: Request):
     """List all nodes with roles and trust scores."""
-    topology = _get_topology()
+    topology = _get_topology(request)
     state = topology.get_topology_state()
     nodes_list = [
         {**node_data, "node_id": node_id}
@@ -71,7 +77,7 @@ async def add_topology_node(request: Request):
     if not node_id:
         return format_api_response(False, error="node_id is required")
 
-    topology = _get_topology()
+    topology = _get_topology(request)
     try:
         capabilities = body.get("capabilities")
         trust_score = body.get("trust_score", 0.5)
@@ -103,9 +109,9 @@ async def add_topology_node(request: Request):
 
 
 @router.delete("/topology/nodes/{node_id}")
-async def remove_topology_node(node_id: str):
+async def remove_topology_node(node_id: str, request: Request):
     """Remove a node from the topology."""
-    topology = _get_topology()
+    topology = _get_topology(request)
     try:
         result = topology.remove_node(node_id)
         return format_api_response(True, data=result.to_dict())
@@ -117,11 +123,12 @@ async def remove_topology_node(node_id: str):
 
 @router.get("/topology/route")
 async def get_route(
+    request: Request,
     from_node: str = Query(..., description="Source node ID"),
     to_node: str = Query(..., description="Destination node ID"),
 ):
     """Find shortest path between two nodes."""
-    topology = _get_topology()
+    topology = _get_topology(request)
     route = topology.get_route(from_node, to_node)
     if route is None:
         return format_api_response(False, error=f"No route found from '{from_node}' to '{to_node}'")
@@ -131,9 +138,9 @@ async def get_route(
 # ── Rebalance ─────────────────────────────────────────
 
 @router.post("/topology/rebalance")
-async def trigger_rebalance():
+async def trigger_rebalance(request: Request):
     """Trigger a manual topology rebalance."""
-    topology = _get_topology()
+    topology = _get_topology(request)
     result = topology.rebalance()
     return format_api_response(True, data=result.to_dict())
 
@@ -141,9 +148,9 @@ async def trigger_rebalance():
 # ── Leader ────────────────────────────────────────────
 
 @router.get("/topology/leader")
-async def get_leader():
+async def get_leader(request: Request):
     """Get the current leader (queen) of the topology."""
-    topology = _get_topology()
+    topology = _get_topology(request)
     state = topology.get_topology_state()
     leader_id = state.queen_id
 

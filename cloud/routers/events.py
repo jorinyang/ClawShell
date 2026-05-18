@@ -7,11 +7,14 @@ router = APIRouter(prefix="/events", tags=["events"])
 
 
 def _get_eventbus(request: Request = None):
+    """Get EventBus — app.state first, then module global fallback."""
+    if request:
+        eb = getattr(request.app.state, 'eventbus', None)
+        if eb:
+            return eb
     import sys
     mod = sys.modules.get('__main__') or sys.modules.get('cloud.main')
     eb = getattr(mod, '_eventbus', None) if mod else None
-    if not eb and request:
-        eb = getattr(request.app.state, 'eventbus', None)
     if not eb:
         raise HTTPException(503, "EventBus not initialized")
     return eb

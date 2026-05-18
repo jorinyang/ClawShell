@@ -33,6 +33,7 @@ _workflow = None   # v2.0 WorkflowEngine
 _optimizer = None  # v2.0 GlobalOptimizer
 _deep_think = None # v2.0 DeepThinkEngine
 _topology = None   # v2.0 TopologyManager
+_knowledge_graph = None  # v2.1 KnowledgeGraph
 
 def set_engines(**kwargs):
     """Inject engine instances."""
@@ -70,6 +71,8 @@ def create_app() -> FastAPI:
     app.state.optimizer = _optimizer
     app.state.deep_think = _deep_think
     app.state.topology = _topology
+    app.state.knowledge_graph = _knowledge_graph
+    app.state.pubsub = getattr(_eventbus, '_pubsub', None)
 
     @app.middleware("http")
     async def cors_middleware(request, call_next):
@@ -101,6 +104,8 @@ def create_app() -> FastAPI:
                 "optimizer": "active" if _optimizer else "inactive",
                 "deep_think": "active" if _deep_think else "inactive",
                 "topology": "active" if _topology else "inactive",
+                "knowledge_graph": "active" if _knowledge_graph else "inactive",
+                "pubsub": "active" if (hasattr(_eventbus, '_pubsub') and _eventbus._pubsub) else "inactive",
             },
             "edges_online": _swarm.online_count() if _swarm else 0,
         }
@@ -165,6 +170,7 @@ def init_engines():
     global _insight  # v1.9.0
     global _brain    # v1.12.0
     global _workflow, _optimizer, _deep_think, _topology
+    global _knowledge_graph
 
     _eventbus = CloudEventBus(data_dir=config.data_dir)
     _eventbus.start_cleanup_daemon()
@@ -219,7 +225,15 @@ def init_engines():
     from cloud.engines.topology_manager import TopologyManager
     _topology = TopologyManager()
 
-    logging.info(f"All 16 engines initialized (v2.1) — Brain LLM: {_brain._llm.is_configured}")
+    # v2.1 — Knowledge graph service
+    from cloud.services.knowledge_graph import KnowledgeGraph
+    _knowledge_graph = KnowledgeGraph(store_dir=os.path.join(config.data_dir, "knowledge_graph"))
+
+    # Wire knowledge graph to insight engine
+    if _insight:
+        _insight._knowledge_graph = _knowledge_graph
+
+    logging.info(f"All 17 engines initialized (v2.1) — Brain LLM: {_brain._llm.is_configured}")
 
 def init_auth_database():
     """Initialize the v2.0 auth database (SQLite WAL)."""

@@ -4,7 +4,12 @@ from shared.protocol import format_api_response
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
-def _get_taskboard():
+def _get_taskboard(request: Request = None):
+    """Get TaskBoard — app.state first, then module global fallback."""
+    if request:
+        tb = getattr(request.app.state, 'task_board', None)
+        if tb:
+            return tb
     import sys
     mod = sys.modules.get('__main__') or sys.modules.get('cloud.main')
     tb = getattr(mod, '_task_board', None) if mod else None
@@ -15,20 +20,20 @@ def _get_taskboard():
 @router.post("/")
 async def create_task(request: Request):
     body = await request.json()
-    tb = _get_taskboard()
+    tb = _get_taskboard(request)
     tid = tb.create_task(body)
     return format_api_response(True, data={"task_id": tid})
 
 @router.get("/")
-async def list_tasks(status: str = Query(None), priority: str = Query(None),
+async def list_tasks(request: Request, status: str = Query(None), priority: str = Query(None),
                      limit: int = Query(100), offset: int = Query(0)):
-    tb = _get_taskboard()
+    tb = _get_taskboard(request)
     tasks = tb.list_tasks(status=status, priority=priority, limit=limit, offset=offset)
     return format_api_response(True, data={"tasks": tasks, "count": len(tasks)})
 
 @router.get("/{task_id}")
-async def get_task(task_id: str):
-    tb = _get_taskboard()
+async def get_task(task_id: str, request: Request):
+    tb = _get_taskboard(request)
     task = tb.get_task(task_id)
     if not task: return format_api_response(False, error="Not found")
     return format_api_response(True, data=task)
@@ -37,7 +42,7 @@ async def get_task(task_id: str):
 async def claim_task(task_id: str, request: Request):
     body = await request.json()
     edge_id = body.get("edge_id", "")
-    tb = _get_taskboard()
+    tb = _get_taskboard(request)
     try:
         task = tb.claim(task_id, edge_id)
         return format_api_response(True, data=task)
@@ -47,7 +52,7 @@ async def claim_task(task_id: str, request: Request):
 @router.post("/{task_id}/complete")
 async def complete_task(task_id: str, request: Request):
     body = await request.json()
-    tb = _get_taskboard()
+    tb = _get_taskboard(request)
     try:
         task = tb.complete(task_id, body.get("result"))
         return format_api_response(True, data=task)
@@ -57,7 +62,7 @@ async def complete_task(task_id: str, request: Request):
 @router.post("/{task_id}/fail")
 async def fail_task(task_id: str, request: Request):
     body = await request.json()
-    tb = _get_taskboard()
+    tb = _get_taskboard(request)
     try:
         task = tb.fail(task_id, body.get("error"))
         return format_api_response(True, data=task)
@@ -65,5 +70,5 @@ async def fail_task(task_id: str, request: Request):
         return format_api_response(False, error=str(e))
 
 @router.get("/stats")
-async def task_stats():
-    return format_api_response(True, data=_get_taskboard().get_stats())
+async def task_stats(request: Request):
+    return format_api_response(True, data=_get_taskboard(request).get_stats())
