@@ -212,6 +212,7 @@ class NodeUpdate(BaseModel):
     metadata: Optional[str] = None
     frameworks: Optional[str] = None
     ide_tools: Optional[str] = None
+    user_id: Optional[str] = None
 
 
 class EndpointConfig(BaseModel):

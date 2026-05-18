@@ -201,6 +201,29 @@ async def delete_shared_credential(sc_id: str, request: Request):
 
 # ── Edge Nodes ───────────────────────────────────────
 
+@router.get("/nodes")
+async def list_all_nodes(
+    request: Request,
+    status: Optional[str] = Query(None),
+    user_id: Optional[str] = Query(None),
+):
+    """List all edge nodes from SQLite. Supports status and user_id filters."""
+    _require_admin(request)
+    with db_ctx() as conn:
+        query = "SELECT * FROM edge_nodes WHERE 1=1"
+        params: list = []
+        if status:
+            query += " AND status = ?"
+            params.append(status)
+        if user_id:
+            query += " AND user_id = ?"
+            params.append(user_id)
+        query += " ORDER BY last_seen DESC"
+        rows = conn.execute(query, params).fetchall()
+        nodes = [dict(row) for row in rows]
+    return {"nodes": nodes, "count": len(nodes)}
+
+
 @router.patch("/nodes/{node_id}")
 async def update_node(node_id: str, data: NodeUpdate, request: Request):
     payload = _require_admin(request)
@@ -210,7 +233,7 @@ async def update_node(node_id: str, data: NodeUpdate, request: Request):
             raise HTTPException(status_code=404, detail="Node not found")
         updates = []
         params = []
-        for field in ("node_name", "node_type", "status", "ip_address", "metadata", "frameworks", "ide_tools"):
+        for field in ("node_name", "node_type", "status", "ip_address", "metadata", "frameworks", "ide_tools", "user_id"):
             val = getattr(data, field, None)
             if val is not None:
                 updates.append(f"{field} = ?")

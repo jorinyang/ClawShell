@@ -132,6 +132,7 @@ def init_database():
                 metadata    TEXT DEFAULT '{}',
                 frameworks  TEXT DEFAULT '[]',
                 ide_tools   TEXT DEFAULT '[]',
+                user_id     TEXT DEFAULT '',
                 last_seen   TEXT DEFAULT (datetime('now')),
                 created_at  TEXT NOT NULL DEFAULT (datetime('now'))
             );
@@ -179,6 +180,13 @@ def init_database():
         except sqlite3.OperationalError:
             conn.execute("ALTER TABLE edge_nodes ADD COLUMN ide_tools TEXT DEFAULT '[]'")
             logger.info("Migrated edge_nodes: added ide_tools column")
+        try:
+            conn.execute("SELECT user_id FROM edge_nodes LIMIT 1")
+        except sqlite3.OperationalError:
+            conn.execute("ALTER TABLE edge_nodes ADD COLUMN user_id TEXT DEFAULT ''")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_edge_nodes_user ON edge_nodes(user_id)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_edge_nodes_status ON edge_nodes(status)")
+            logger.info("Migrated edge_nodes: added user_id column")
 
         # Run incremental migrations for existing DBs
         _migrate(conn)

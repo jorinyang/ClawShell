@@ -11,6 +11,8 @@ Endpoints:
 """
 
 from __future__ import annotations
+import json as _json
+import time
 from typing import Optional
 from fastapi import APIRouter, Request, Query, HTTPException
 from shared.protocol import format_api_response
@@ -19,17 +21,92 @@ router = APIRouter(tags=["nodes"])
 
 
 def _get_registry():
-    """Get CapabilityRegistry from app state."""
-    from cloud.main import _capability_registry
-    if not _capability_registry:
+    """Get CapabilityRegistry from the running main module."""
+    import sys
+    main_mod = sys.modules.get('cloud.main') or sys.modules.get('__main__')
+    reg = getattr(main_mod, '_capability_registry', None) if main_mod else None
+    if not reg:
         raise HTTPException(status_code=503, detail="CapabilityRegistry not initialized")
-    return _capability_registry
+    return reg
 
 
 def _get_topology():
-    """Get TopologyManager from global engine reference (optional)."""
-    from cloud.main import _topology
-    return _topology  # May be None if not initialized yet
+    """Get TopologyManager (optional, may not exist)."""
+    return getattr(__import__('cloud.main', fromlist=['_topology']), '_topology', None)
+
+
+def _extract_user_id(request: Request) -> str:
+    """Try to extract user_id from JWT token. Returns '' if no auth."""
+    try:
+        auth = request.headers.get("Authorization", "")
+        if not auth.startswith("Bearer "):
+            return ""
+        token = auth[7:]
+        from cloud.auth.session_service import SessionService
+        payload = SessionService.verify_token(token)
+        if payload:
+            return payload.get("sub", "")
+    except Exception:
+        pass
+    return ""
+
+
+def _sync_node_to_sqlite(node_id: str, node_info: dict, user_id: str = ""):
+    """INSERT or UPDATE a node in the SQLite edge_nodes table."""
+    try:
+        from cloud.auth.database import db_ctx
+        node_name = node_info.get("node_name", node_id)
+        node_type = node_info.get("node_type", "edge")
+        status = node_info.get("status", "online")
+        ip_address = node_info.get("ip_address", "")
+        metadata = _json.dumps(node_info.get("metadata", {}))
+        frameworks = _json.dumps(node_info.get("frameworks", []))
+        ide_tools = _json.dumps(node_info.get("ide_tools", []))
+        now = time.strftime("%Y-%m-%d %H:%M:%S")
+
+        with db_ctx() as conn:
+            conn.execute("""
+                INSERT INTO edge_nodes (node_id, node_name, node_type, status, ip_address,
+                                        metadata, frameworks, ide_tools, user_id, last_seen, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(node_id) DO UPDATE SET
+                    node_name = excluded.node_name,
+                    node_type = excluded.node_type,
+                    status = excluded.status,
+                    ip_address = excluded.ip_address,
+                    metadata = excluded.metadata,
+                    frameworks = excluded.frameworks,
+                    ide_tools = excluded.ide_tools,
+                    user_id = CASE WHEN excluded.user_id != '' THEN excluded.user_id ELSE edge_nodes.user_id END,
+                    last_seen = excluded.last_seen
+            """, (node_id, node_name, node_type, status, ip_address,
+                  metadata, frameworks, ide_tools, user_id, now, now))
+    except Exception:
+        pass  # Don't break registration if SQLite write fails
+
+
+def _update_node_heartbeat_sqlite(node_id: str, status: str = "online",
+                                   metrics: Optional[dict] = None, frameworks=None, ide_tools=None):
+    """UPDATE a node's last_seen and status in SQLite on heartbeat."""
+    try:
+        from cloud.auth.database import db_ctx
+        now = time.strftime("%Y-%m-%d %H:%M:%S")
+        with db_ctx() as conn:
+            updates = ["last_seen = ?", "status = ?"]
+            params = [now, status]
+            if frameworks is not None:
+                updates.append("frameworks = ?")
+                params.append(_json.dumps(frameworks))
+            if ide_tools is not None:
+                updates.append("ide_tools = ?")
+                params.append(_json.dumps(ide_tools))
+            params.append(node_id)
+            conn.execute(
+                f"UPDATE edge_nodes SET {', '.join(updates)} WHERE node_id = ?",
+                params
+            )
+    except Exception:
+        pass
 
 
 # ── Node Registration ─────────────────────────────
@@ -46,6 +123,9 @@ async def register_node(request: Request):
     if not node_id:
         return format_api_response(False, error="node_id is required")
 
+    # Try to extract user_id from JWT (backward compatible — no auth required)
+    user_id = _extract_user_id(request)
+
     registry = _get_registry()
     try:
         nid = registry.register(body)
@@ -60,6 +140,11 @@ async def register_node(request: Request):
                 )
             except ValueError:
                 pass  # Already registered in topology
+
+        # Sync to SQLite so the admin dashboard can see it
+        body_with_status = {**body, "status": "online"}
+        _sync_node_to_sqlite(nid, body_with_status, user_id=user_id)
+
         return format_api_response(True, data={"node_id": nid, "status": "registered"})
     except ValueError as e:
         return format_api_response(False, error=str(e))
@@ -78,6 +163,10 @@ async def node_heartbeat(node_id: str, request: Request):
     ok = registry.heartbeat(node_id, metrics)
     if not ok:
         return format_api_response(False, error=f"Node '{node_id}' not found")
+
+    # Update SQLite
+    _update_node_heartbeat_sqlite(node_id, status="online")
+
     return format_api_response(True, data={"node_id": node_id, "status": "ack"})
 
 
@@ -121,6 +210,13 @@ async def deregister_node(node_id: str):
                 topology.remove_node(node_id)
             except ValueError:
                 pass  # Not in topology
+        # Also remove from SQLite
+        try:
+            from cloud.auth.database import db_ctx
+            with db_ctx() as conn:
+                conn.execute("DELETE FROM edge_nodes WHERE node_id = ?", (node_id,))
+        except Exception:
+            pass
     if not ok:
         return format_api_response(False, error=f"Node '{node_id}' not found")
     return format_api_response(True, data={"node_id": node_id, "status": "deregistered"})
@@ -156,5 +252,11 @@ async def health_report(request: Request):
             "frameworks": frameworks or [],
             "ide_tools": ide_tools or [],
         })
+
+    # Update SQLite with latest heartbeat data
+    _update_node_heartbeat_sqlite(
+        node_id, status="online",
+        frameworks=frameworks, ide_tools=ide_tools,
+    )
 
     return format_api_response(True, data={"node_id": node_id, "status": "reported"})
