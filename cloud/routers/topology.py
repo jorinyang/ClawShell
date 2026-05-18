@@ -20,10 +20,12 @@ router = APIRouter(tags=["topology"])
 
 def _get_topology():
     """Get TopologyManager from global engine reference."""
-    from cloud.main import _topology
-    if not _topology:
+    import sys
+    mod = sys.modules.get('__main__') or sys.modules.get('cloud.main')
+    topo = getattr(mod, '_topology', None) if mod else None
+    if not topo:
         raise HTTPException(status_code=503, detail="TopologyManager not initialized")
-    return _topology
+    return topo
 
 
 # ── Topology State ────────────────────────────────────

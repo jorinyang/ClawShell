@@ -27,8 +27,12 @@ _evolution = None
 _review = None
 _broadcast = None
 _n8n_bridge = None
-_insight = None  # v1.9.0 InsightEngine
-_brain = None    # v1.12.0 CloudBrain LLM analyst
+_insight = None    # v1.9.0 InsightEngine
+_brain = None      # v1.12.0 CloudBrain LLM analyst
+_workflow = None   # v2.0 WorkflowEngine
+_optimizer = None  # v2.0 GlobalOptimizer
+_deep_think = None # v2.0 DeepThinkEngine
+_topology = None   # v2.0 TopologyManager
 
 def set_engines(**kwargs):
     """Inject engine instances."""
@@ -62,6 +66,10 @@ def create_app() -> FastAPI:
     app.state.n8n_bridge = _n8n_bridge
     app.state.insight = _insight
     app.state.brain = _brain
+    app.state.workflow = _workflow
+    app.state.optimizer = _optimizer
+    app.state.deep_think = _deep_think
+    app.state.topology = _topology
 
     @app.middleware("http")
     async def cors_middleware(request, call_next):
@@ -89,6 +97,10 @@ def create_app() -> FastAPI:
                 "n8n": "active" if _n8n_bridge else "inactive",
                 "insight": "active" if _insight else "inactive",
                 "brain": "active" if _brain else "inactive",
+                "workflow": "active" if _workflow else "inactive",
+                "optimizer": "active" if _optimizer else "inactive",
+                "deep_think": "active" if _deep_think else "inactive",
+                "topology": "active" if _topology else "inactive",
             },
             "edges_online": _swarm.online_count() if _swarm else 0,
         }
@@ -112,6 +124,12 @@ def create_app() -> FastAPI:
     app.include_router(reviews_router, prefix="/api/v1")
     app.include_router(evolution_router, prefix="/api/v1")
     app.include_router(brain_router, prefix="/api/v1")
+
+    from cloud.routers.engines import router as engines_router
+    from cloud.routers.topology import router as topology_router
+
+    app.include_router(engines_router, prefix="/api/v1")
+    app.include_router(topology_router, prefix="/api/v1")
 
     # ── v2.0 Auth & Admin Routers ────────────────────
     from cloud.routers.auth import router as auth_router
@@ -146,6 +164,7 @@ def init_engines():
     global _evolution, _review, _broadcast, _n8n_bridge
     global _insight  # v1.9.0
     global _brain    # v1.12.0
+    global _workflow, _optimizer, _deep_think, _topology
 
     _eventbus = CloudEventBus(data_dir=config.data_dir)
     _eventbus.start_cleanup_daemon()
@@ -184,8 +203,23 @@ def init_engines():
     # v1.12.0 — CloudBrain: LLM-powered analysis (event-driven + periodic)
     _brain = CloudAnalyst(eventbus=_eventbus, data_dir=config.data_dir)
     _brain.start()
+    # v2.0 — Workflow engine
+    from cloud.engines.workflow import WorkflowEngine
+    _workflow = WorkflowEngine(data_dir=config.data_dir)
 
-    logging.info(f"All 13 engines initialized (v2.1) — Brain LLM: {_brain._llm.is_configured}")
+    # v2.0 — Global optimizer
+    from cloud.engines.optimizer import GlobalOptimizer
+    _optimizer = GlobalOptimizer(data_dir=config.data_dir)
+
+    # v2.0 — Deep think engine
+    from cloud.engines.deep_think import DeepThinkEngine
+    _deep_think = DeepThinkEngine(data_dir=config.data_dir)
+
+    # v2.0 — Topology manager
+    from cloud.engines.topology_manager import TopologyManager
+    _topology = TopologyManager(data_dir=config.data_dir)
+
+    logging.info(f"All 16 engines initialized (v2.1) — Brain LLM: {_brain._llm.is_configured}")
 
 def init_auth_database():
     """Initialize the v2.0 auth database (SQLite WAL)."""

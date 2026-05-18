@@ -5,9 +5,11 @@ from shared.protocol import format_api_response
 router = APIRouter(prefix="/skills", tags=["skills"])
 
 def _get_skill_market():
-    from cloud.main import _skill_market
-    if not _skill_market: raise HTTPException(503, "SkillMarket not initialized")
-    return _skill_market
+    import sys
+    mod = sys.modules.get('__main__') or sys.modules.get('cloud.main')
+    sm = getattr(mod, '_skill_market', None) if mod else None
+    if not sm: raise HTTPException(503, "SkillMarket not initialized")
+    return sm
 
 @router.post("/")
 async def publish_skill(request: Request):

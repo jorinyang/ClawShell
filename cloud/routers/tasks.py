@@ -5,10 +5,12 @@ from shared.protocol import format_api_response
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
 def _get_taskboard():
-    from cloud.main import _task_board
-    if not _task_board:
+    import sys
+    mod = sys.modules.get('__main__') or sys.modules.get('cloud.main')
+    tb = getattr(mod, '_task_board', None) if mod else None
+    if not tb:
         raise HTTPException(503, "TaskBoard not initialized")
-    return _task_board
+    return tb
 
 @router.post("/")
 async def create_task(request: Request):

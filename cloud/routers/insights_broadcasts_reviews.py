@@ -8,19 +8,32 @@ reviews_router = APIRouter(prefix="/reviews", tags=["reviews"])
 evolution_router = APIRouter(prefix="/evolution", tags=["evolution"])
 
 def _get_evolution():
-    from cloud.main import _evolution
-    if not _evolution: raise HTTPException(503)
-    return _evolution
+    import sys
+    mod = sys.modules.get('__main__') or sys.modules.get('cloud.main')
+    evo = getattr(mod, '_evolution', None) if mod else None
+    if not evo: raise HTTPException(503)
+    return evo
 
 def _get_broadcast():
-    from cloud.main import _broadcast
-    if not _broadcast: raise HTTPException(503)
-    return _broadcast
+    import sys
+    mod = sys.modules.get('__main__') or sys.modules.get('cloud.main')
+    bc = getattr(mod, '_broadcast', None) if mod else None
+    if not bc: raise HTTPException(503)
+    return bc
 
 def _get_review():
-    from cloud.main import _review
-    if not _review: raise HTTPException(503)
-    return _review
+    import sys
+    mod = sys.modules.get('__main__') or sys.modules.get('cloud.main')
+    rv = getattr(mod, '_review', None) if mod else None
+    if not rv: raise HTTPException(503)
+    return rv
+
+def _get_insight():
+    import sys
+    mod = sys.modules.get('__main__') or sys.modules.get('cloud.main')
+    ins = getattr(mod, '_insight', None) if mod else None
+    if not ins: raise HTTPException(503)
+    return ins
 
 # ── Insights ──
 @insights_router.get("/")

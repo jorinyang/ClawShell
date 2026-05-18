@@ -7,14 +7,14 @@ router = APIRouter(prefix="/events", tags=["events"])
 
 
 def _get_eventbus(request: Request = None):
-    if request and hasattr(request.app.state, "eventbus"):
-        eb = request.app.state.eventbus
-        if eb:
-            return eb
-    from cloud.main import _eventbus
-    if not _eventbus:
+    import sys
+    mod = sys.modules.get('__main__') or sys.modules.get('cloud.main')
+    eb = getattr(mod, '_eventbus', None) if mod else None
+    if not eb and request:
+        eb = getattr(request.app.state, 'eventbus', None)
+    if not eb:
         raise HTTPException(503, "EventBus not initialized")
-    return _eventbus
+    return eb
 
 
 @router.post("/batch")

@@ -30,10 +30,10 @@ class SelfRepairEngine:
         self._repair_log: List[dict] = []
 
         # Register default fix actions
-        self.FIX_ACTIONS["restart_gateway"] = self._noop
-        self.FIX_ACTIONS["restart_daemons"] = self._noop
-        self.FIX_ACTIONS["clear_cache"] = self._noop
-        self.FIX_ACTIONS["rotate_logs"] = self._noop
+        self.FIX_ACTIONS["restart_gateway"] = self._restart_gateway
+        self.FIX_ACTIONS["restart_daemons"] = self._restart_daemons
+        self.FIX_ACTIONS["clear_cache"] = self._clear_cache
+        self.FIX_ACTIONS["rotate_logs"] = self._rotate_logs
 
     def detect_issues(self) -> List[dict]:
         """Detect system issues."""
@@ -114,6 +114,50 @@ class SelfRepairEngine:
     @staticmethod
     def _noop(*args, **kwargs):
         pass
+
+    @staticmethod
+    def _restart_gateway():
+        """Restart edge gateway services."""
+        import subprocess
+        try:
+            subprocess.run(["pkill", "-f", "edge.mcp.bridge_daemon"], timeout=5, capture_output=True)
+            subprocess.run(["pkill", "-f", "edge.sync.daemon"], timeout=5, capture_output=True)
+        except Exception:
+            pass
+
+    @staticmethod
+    def _restart_daemons():
+        """Restart edge daemon processes."""
+        import subprocess
+        try:
+            subprocess.run(["pkill", "-f", "exoskeleton_daemon"], timeout=5, capture_output=True)
+        except Exception:
+            pass
+
+    @staticmethod
+    def _clear_cache():
+        """Clear temporary caches to free memory."""
+        import gc
+        gc.collect()
+        import tempfile
+        import glob
+        for f in glob.glob(os.path.join(tempfile.gettempdir(), "clawshell_*")):
+            try:
+                os.remove(f)
+            except Exception:
+                pass
+
+    @staticmethod
+    def _rotate_logs():
+        """Rotate log files to free disk space."""
+        import glob
+        log_dir = os.path.expanduser("~/.clawshell/logs")
+        if os.path.exists(log_dir):
+            for f in glob.glob(os.path.join(log_dir, "*.log.*")):
+                try:
+                    os.remove(f)
+                except Exception:
+                    pass
 
 
 class FeedbackControlLoop:

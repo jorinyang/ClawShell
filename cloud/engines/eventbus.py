@@ -374,13 +374,21 @@ class CloudEventBus:
         with self._lock:
             expired = [
                 eid for eid, evt in self._events.items()
-                if evt.get("timestamp", 0) < cutoff
+                if self._ts_less_than(evt.get("timestamp", 0), cutoff)
             ]
             for eid in expired:
                 self._remove_event(eid)
             if expired:
                 # Clean up empty date directories
                 self._clean_empty_dirs()
+
+    @staticmethod
+    def _ts_less_than(ts, cutoff):
+        """Compare timestamp safely, handling string timestamps."""
+        if isinstance(ts, str):
+            try: ts = float(ts)
+            except (ValueError, TypeError): ts = 0
+        return ts < cutoff
 
     def _remove_event(self, event_id: str):
         """Remove a single event and its indices."""
