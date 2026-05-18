@@ -6,7 +6,7 @@ Supports: DeepSeek, OpenAI, and any OpenAI-compatible endpoint.
 Configuration via environment variables:
   DEEPSEEK_API_KEY / OPENAI_API_KEY / LLM_API_KEY
   LLM_BASE_URL (default: https://api.deepseek.com/v1)
-  LLM_MODEL    (default: deepseek-chat)
+  LLM_MODEL    (default: deepseek-v4-pro)
 """
 from __future__ import annotations
 import os
@@ -42,7 +42,7 @@ class LLMClient:
         """
         self.api_key = api_key or os.environ.get("DEEPSEEK_API_KEY") or os.environ.get("OPENAI_API_KEY") or os.environ.get("LLM_API_KEY", "")
         self.base_url = (base_url or os.environ.get("LLM_BASE_URL") or "https://api.deepseek.com/v1").rstrip("/")
-        self.model = model or os.environ.get("LLM_MODEL", "deepseek-chat")
+        self.model = model or os.environ.get("LLM_MODEL", "deepseek-v4-pro")
         self.timeout = timeout
 
     @property
