@@ -205,19 +205,19 @@ def init_engines():
     _brain.start()
     # v2.0 — Workflow engine
     from cloud.engines.workflow import WorkflowEngine
-    _workflow = WorkflowEngine(data_dir=config.data_dir)
+    _workflow = WorkflowEngine(store_dir=os.path.join(config.data_dir, "workflows"))
 
     # v2.0 — Global optimizer
     from cloud.engines.optimizer import GlobalOptimizer
-    _optimizer = GlobalOptimizer(data_dir=config.data_dir)
+    _optimizer = GlobalOptimizer()
 
     # v2.0 — Deep think engine
     from cloud.engines.deep_think import DeepThinkEngine
-    _deep_think = DeepThinkEngine(data_dir=config.data_dir)
+    _deep_think = DeepThinkEngine()
 
     # v2.0 — Topology manager
     from cloud.engines.topology_manager import TopologyManager
-    _topology = TopologyManager(data_dir=config.data_dir)
+    _topology = TopologyManager()
 
     logging.info(f"All 16 engines initialized (v2.1) — Brain LLM: {_brain._llm.is_configured}")
 
