@@ -519,6 +519,18 @@ class EdgeSyncDaemon:
             except (json.JSONDecodeError, TypeError) as e:
                 logger.warning(f"Failed to parse Memos Cloud credential: {e}")
 
+    # ── System Info ────────────────────────────────────
+
+    @property
+    def _system_info(self):
+        if not hasattr(self, '_cached_sys_info'):
+            try:
+                from edge.detector.system import detect_system_info
+                self._cached_sys_info = detect_system_info()
+            except Exception:
+                self._cached_sys_info = {}
+        return self._cached_sys_info
+
     # ── Health ────────────────────────────────────
 
     def _report_health(self):
@@ -547,10 +559,20 @@ class EdgeSyncDaemon:
         except Exception:
             pass
 
+        # Include system info (cached after first call)
+        sys_info = self._system_info
+
         try:
             import psutil
             health = {
                 "node_id": self._client._edge_id,
+                "hostname": sys_info.get("hostname", ""),
+                "ip_address": sys_info.get("ip_address", ""),
+                "os": sys_info.get("os", ""),
+                "os_version": sys_info.get("os_version", ""),
+                "python_version": sys_info.get("python_version", ""),
+                "cpu_count": sys_info.get("cpu_count", 0),
+                "memory_total_mb": sys_info.get("memory_total_mb", 0),
                 "metrics": {
                     "cpu_percent": psutil.cpu_percent(interval=1),
                     "memory_percent": psutil.virtual_memory().percent,
@@ -564,6 +586,13 @@ class EdgeSyncDaemon:
         except ImportError:
             health = {
                 "node_id": self._client._edge_id,
+                "hostname": sys_info.get("hostname", ""),
+                "ip_address": sys_info.get("ip_address", ""),
+                "os": sys_info.get("os", ""),
+                "os_version": sys_info.get("os_version", ""),
+                "python_version": sys_info.get("python_version", ""),
+                "cpu_count": sys_info.get("cpu_count", 0),
+                "memory_total_mb": sys_info.get("memory_total_mb", 0),
                 "metrics": {"cpu_percent": 0, "memory_percent": 0, "disk_percent": 0},
                 "frameworks": frameworks,
                 "ide_tools": ide_tools,

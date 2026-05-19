@@ -61,10 +61,64 @@ def _extract_user_id(request: Request) -> str:
     return ""
 
 
+def _ensure_edge_nodes_table():
+    """Create edge_nodes table with all columns if it doesn't exist."""
+    try:
+        from cloud.auth.database import db_ctx
+        with db_ctx() as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS edge_nodes (
+                    node_id         TEXT PRIMARY KEY,
+                    node_name       TEXT NOT NULL,
+                    node_type       TEXT DEFAULT 'edge',
+                    status          TEXT DEFAULT 'offline',
+                    ip_address      TEXT DEFAULT '',
+                    metadata        TEXT DEFAULT '{}',
+                    frameworks      TEXT DEFAULT '[]',
+                    ide_tools       TEXT DEFAULT '[]',
+                    user_id         TEXT DEFAULT '',
+                    hostname        TEXT DEFAULT '',
+                    os              TEXT DEFAULT '',
+                    os_version      TEXT DEFAULT '',
+                    python_version  TEXT DEFAULT '',
+                    cpu_count       INTEGER DEFAULT 0,
+                    memory_total_mb REAL DEFAULT 0,
+                    last_seen       TEXT DEFAULT (datetime('now')),
+                    created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+                );
+            """)
+    except Exception:
+        pass
+
+
+def _migrate_edge_nodes_columns():
+    """Add new system info columns to edge_nodes if missing."""
+    try:
+        from cloud.auth.database import db_ctx
+        with db_ctx() as conn:
+            for col, col_def in [
+                ("hostname", "ALTER TABLE edge_nodes ADD COLUMN hostname TEXT DEFAULT ''"),
+                ("os", "ALTER TABLE edge_nodes ADD COLUMN os TEXT DEFAULT ''"),
+                ("os_version", "ALTER TABLE edge_nodes ADD COLUMN os_version TEXT DEFAULT ''"),
+                ("python_version", "ALTER TABLE edge_nodes ADD COLUMN python_version TEXT DEFAULT ''"),
+                ("cpu_count", "ALTER TABLE edge_nodes ADD COLUMN cpu_count INTEGER DEFAULT 0"),
+                ("memory_total_mb", "ALTER TABLE edge_nodes ADD COLUMN memory_total_mb REAL DEFAULT 0"),
+            ]:
+                try:
+                    conn.execute(f"SELECT {col} FROM edge_nodes LIMIT 1")
+                except Exception:
+                    conn.execute(col_def)
+    except Exception:
+        pass
+
+
 def _sync_node_to_sqlite(node_id: str, node_info: dict, user_id: str = ""):
     """INSERT or UPDATE a node in the SQLite edge_nodes table."""
     try:
         from cloud.auth.database import db_ctx
+        _ensure_edge_nodes_table()
+        _migrate_edge_nodes_columns()
+
         node_name = node_info.get("node_name", node_id)
         node_type = node_info.get("node_type", "edge")
         status = node_info.get("status", "online")
@@ -72,25 +126,42 @@ def _sync_node_to_sqlite(node_id: str, node_info: dict, user_id: str = ""):
         metadata = _json.dumps(node_info.get("metadata", {}))
         frameworks = _json.dumps(node_info.get("frameworks", []))
         ide_tools = _json.dumps(node_info.get("ide_tools", []))
+        hostname = node_info.get("hostname", "")
+        os_name = node_info.get("os", "")
+        os_version = node_info.get("os_version", "")
+        python_version = node_info.get("python_version", "")
+        cpu_count = node_info.get("cpu_count", 0)
+        memory_total_mb = node_info.get("memory_total_mb", 0)
         now = time.strftime("%Y-%m-%d %H:%M:%S")
 
         with db_ctx() as conn:
             conn.execute("""
                 INSERT INTO edge_nodes (node_id, node_name, node_type, status, ip_address,
-                                        metadata, frameworks, ide_tools, user_id, last_seen, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                        metadata, frameworks, ide_tools, user_id,
+                                        hostname, os, os_version, python_version,
+                                        cpu_count, memory_total_mb,
+                                        last_seen, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(node_id) DO UPDATE SET
                     node_name = excluded.node_name,
                     node_type = excluded.node_type,
                     status = excluded.status,
-                    ip_address = excluded.ip_address,
+                    ip_address = CASE WHEN excluded.ip_address != '' THEN excluded.ip_address ELSE edge_nodes.ip_address END,
                     metadata = excluded.metadata,
                     frameworks = excluded.frameworks,
                     ide_tools = excluded.ide_tools,
                     user_id = CASE WHEN excluded.user_id != '' THEN excluded.user_id ELSE edge_nodes.user_id END,
+                    hostname = CASE WHEN excluded.hostname != '' THEN excluded.hostname ELSE edge_nodes.hostname END,
+                    os = CASE WHEN excluded.os != '' THEN excluded.os ELSE edge_nodes.os END,
+                    os_version = CASE WHEN excluded.os_version != '' THEN excluded.os_version ELSE edge_nodes.os_version END,
+                    python_version = CASE WHEN excluded.python_version != '' THEN excluded.python_version ELSE edge_nodes.python_version END,
+                    cpu_count = CASE WHEN excluded.cpu_count != 0 THEN excluded.cpu_count ELSE edge_nodes.cpu_count END,
+                    memory_total_mb = CASE WHEN excluded.memory_total_mb != 0 THEN excluded.memory_total_mb ELSE edge_nodes.memory_total_mb END,
                     last_seen = excluded.last_seen
             """, (node_id, node_name, node_type, status, ip_address,
-                  metadata, frameworks, ide_tools, user_id, now, now))
+                  metadata, frameworks, ide_tools, user_id,
+                  hostname, os_name, os_version, python_version,
+                  cpu_count, memory_total_mb, now, now))
     except Exception:
         pass  # Don't break registration if SQLite write fails
 
@@ -241,6 +312,8 @@ async def health_report(request: Request):
 
     Accepts frameworks and ide_tools in the payload so the cloud can
     track which frameworks and IDE tools each edge node has.
+    Also accepts system info fields (hostname, ip_address, os, os_version,
+    python_version, cpu_count, memory_total_mb) to keep node info current.
     """
     try:
         body = await request.json()
@@ -264,10 +337,35 @@ async def health_report(request: Request):
             "ide_tools": ide_tools or [],
         })
 
+    # Update system info in registry if provided in health report
+    system_info_fields = ["hostname", "ip_address", "os", "os_version",
+                          "python_version", "cpu_count", "memory_total_mb"]
+    has_system_info = any(body.get(f) for f in system_info_fields)
+    if has_system_info:
+        node = registry.get_node(node_id)
+        if node:
+            update = {}
+            for field in system_info_fields:
+                val = body.get(field)
+                if val:
+                    update[field] = val
+            if update:
+                with registry._lock:
+                    node_obj = registry._nodes.get(node_id)
+                    if node_obj:
+                        node_obj.update(update)
+                        registry._save()
+
     # Update SQLite with latest heartbeat data
     _update_node_heartbeat_sqlite(
         node_id, status="online",
         frameworks=frameworks, ide_tools=ide_tools,
     )
+
+    # Sync system info to SQLite if provided
+    if has_system_info:
+        sys_info = {f: body.get(f) for f in system_info_fields if body.get(f)}
+        sys_info["status"] = "online"
+        _sync_node_to_sqlite(node_id, sys_info)
 
     return format_api_response(True, data={"node_id": node_id, "status": "reported"})
