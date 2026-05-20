@@ -3,6 +3,8 @@
 > **一云多端云边协同分布式神经系统** | Multi-Account · Cloud Dashboard · Credential Sync
 >
 > Version 2.0.0 | CloudHub (云枢) + Edge Brain (端脑) + Dashboard (控制台) | Engineering Cybernetics | 智询工作室
+>
+> 🌐 **官网:** [https://clawshell.club](https://clawshell.club) · **管理后台:** [https://cloud.clawshell.club](https://cloud.clawshell.club)
 
 ---
 
