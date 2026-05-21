@@ -34,6 +34,8 @@ _optimizer = None  # v2.0 GlobalOptimizer
 _deep_think = None # v2.0 DeepThinkEngine
 _topology = None   # v2.0 TopologyManager
 _knowledge_graph = None  # v2.1 KnowledgeGraph
+_cron_supervisor = None  # v2.1 CloudCronSupervisor
+_dispatch_router = None   # v2.1 DispatchRouter
 
 def set_engines(**kwargs):
     """Inject engine instances."""
@@ -73,6 +75,8 @@ def create_app() -> FastAPI:
     app.state.topology = _topology
     app.state.knowledge_graph = _knowledge_graph
     app.state.pubsub = getattr(_eventbus, '_pubsub', None)
+    app.state.cron_supervisor = _cron_supervisor
+    app.state.dispatch_router = _dispatch_router
 
     @app.middleware("http")
     async def cors_middleware(request, call_next):
@@ -136,6 +140,10 @@ def create_app() -> FastAPI:
     app.include_router(engines_router, prefix="/api/v1")
     app.include_router(topology_router, prefix="/api/v1")
 
+    # ── v2.1 CronSupervisor Router ─────────────────────
+    from cloud.routers.cron_supervisor import router as cron_supervisor_router
+    app.include_router(cron_supervisor_router, prefix="/api/v1")
+
     # ── v2.0 Auth & Admin Routers ────────────────────
     from cloud.routers.auth import router as auth_router
     from cloud.routers.admin import router as admin_router
@@ -171,6 +179,7 @@ def init_engines():
     global _brain    # v1.12.0
     global _workflow, _optimizer, _deep_think, _topology
     global _knowledge_graph
+    global _cron_supervisor, _dispatch_router
 
     _eventbus = CloudEventBus(data_dir=config.data_dir)
     _eventbus.start_cleanup_daemon()
@@ -233,7 +242,27 @@ def init_engines():
     if _insight:
         _insight._knowledge_graph = _knowledge_graph
 
-    logging.info(f"All 17 engines initialized (v2.1) — Brain LLM: {_brain._llm.is_configured}")
+    # v2.1 — DispatchRouter (needs eventbus + task_board)
+    from cloud.engines.dispatch_router import DispatchRouter
+    _dispatch_router = DispatchRouter(
+        eventbus=_eventbus,
+        task_board=_task_board,
+        data_dir=config.data_dir,
+    )
+
+    # v2.1 — CloudCronSupervisor (needs scheduler + capability_registry + dispatch_router)
+    from cloud.engines.cron_supervisor import CloudCronSupervisor
+    _cron_supervisor = CloudCronSupervisor(
+        data_dir=config.data_dir,
+        scheduler=_scheduler,
+        eventbus=_eventbus,
+        task_board=_task_board,
+        capability_registry=_capability_registry,
+        dispatch_router=_dispatch_router,
+    )
+    _cron_supervisor.start()
+
+    logging.info(f"All 19 engines initialized (v2.1) — Brain LLM: {_brain._llm.is_configured}")
 
 def init_auth_database():
     """Initialize the v2.0 auth database (SQLite WAL)."""
