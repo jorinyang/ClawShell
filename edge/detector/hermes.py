@@ -21,15 +21,31 @@ class HermesDetector(BaseDetector):
         configs = self.check_configs()
         config_path = configs[0] if configs else ""
 
-        # Read version from config or skills
+        # Read version: try hermes CLI first, then VERSION file
         version = "unknown"
         try:
-            version_file = os.path.join(root, "VERSION")
-            if os.path.exists(version_file):
-                with open(version_file) as f:
-                    version = f.read().strip()
+            import subprocess
+            result = subprocess.run(
+                ["hermes", "--version"],
+                capture_output=True, text=True, timeout=5
+            )
+            if result.returncode == 0:
+                # Parse "Hermes Agent v0.14.0 (2026.5.16)" → "0.14.0"
+                import re
+                m = re.search(r"v(\d+\.\d+\.\d+)", result.stdout)
+                version = m.group(1) if m else result.stdout.strip()
         except Exception:
             pass
+
+        # Fallback: read from VERSION file
+        if version == "unknown":
+            try:
+                version_file = os.path.join(root, "VERSION")
+                if os.path.exists(version_file):
+                    with open(version_file) as f:
+                        version = f.read().strip()
+            except Exception:
+                pass
 
         # Count skills
         skill_count = 0

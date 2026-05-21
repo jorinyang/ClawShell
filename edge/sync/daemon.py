@@ -519,6 +519,25 @@ class EdgeSyncDaemon:
             except (json.JSONDecodeError, TypeError) as e:
                 logger.warning(f"Failed to parse Memos Cloud credential: {e}")
 
+    # ── Version ────────────────────────────────────
+
+    def _get_edge_version(self) -> str:
+        """Get edge/ClawShell version for health reporting."""
+        import re
+        try:
+            import subprocess
+            result = subprocess.run(
+                ["hermes", "--version"],
+                capture_output=True, text=True, timeout=5
+            )
+            if result.returncode == 0:
+                m = re.search(r"v(\d+\.\d+\.\d+)", result.stdout)
+                if m:
+                    return m.group(1)
+        except Exception:
+            pass
+        return "unknown"
+
     # ── System Info ────────────────────────────────────
 
     @property
@@ -566,6 +585,7 @@ class EdgeSyncDaemon:
             import psutil
             health = {
                 "node_id": self._client._edge_id,
+                "version": self._get_edge_version(),
                 "hostname": sys_info.get("hostname", ""),
                 "ip_address": sys_info.get("ip_address", ""),
                 "os": sys_info.get("os", ""),
@@ -586,6 +606,7 @@ class EdgeSyncDaemon:
         except ImportError:
             health = {
                 "node_id": self._client._edge_id,
+                "version": self._get_edge_version(),
                 "hostname": sys_info.get("hostname", ""),
                 "ip_address": sys_info.get("ip_address", ""),
                 "os": sys_info.get("os", ""),

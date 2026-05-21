@@ -83,6 +83,7 @@ def _ensure_edge_nodes_table():
                     python_version  TEXT DEFAULT '',
                     cpu_count       INTEGER DEFAULT 0,
                     memory_total_mb REAL DEFAULT 0,
+                    version         TEXT DEFAULT '',
                     last_seen       TEXT DEFAULT (datetime('now')),
                     created_at      TEXT NOT NULL DEFAULT (datetime('now'))
                 );
@@ -103,6 +104,7 @@ def _migrate_edge_nodes_columns():
                 ("python_version", "ALTER TABLE edge_nodes ADD COLUMN python_version TEXT DEFAULT ''"),
                 ("cpu_count", "ALTER TABLE edge_nodes ADD COLUMN cpu_count INTEGER DEFAULT 0"),
                 ("memory_total_mb", "ALTER TABLE edge_nodes ADD COLUMN memory_total_mb REAL DEFAULT 0"),
+                ("version", "ALTER TABLE edge_nodes ADD COLUMN version TEXT DEFAULT ''"),
             ]:
                 try:
                     conn.execute(f"SELECT {col} FROM edge_nodes LIMIT 1")
@@ -132,6 +134,7 @@ def _sync_node_to_sqlite(node_id: str, node_info: dict, user_id: str = ""):
         python_version = node_info.get("python_version", "")
         cpu_count = node_info.get("cpu_count", 0)
         memory_total_mb = node_info.get("memory_total_mb", 0)
+        version = node_info.get("version", "")
         now = time.strftime("%Y-%m-%d %H:%M:%S")
 
         with db_ctx() as conn:
@@ -139,9 +142,9 @@ def _sync_node_to_sqlite(node_id: str, node_info: dict, user_id: str = ""):
                 INSERT INTO edge_nodes (node_id, node_name, node_type, status, ip_address,
                                         metadata, frameworks, ide_tools, user_id,
                                         hostname, os, os_version, python_version,
-                                        cpu_count, memory_total_mb,
+                                        cpu_count, memory_total_mb, version,
                                         last_seen, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(node_id) DO UPDATE SET
                     node_name = excluded.node_name,
                     node_type = excluded.node_type,
@@ -157,11 +160,12 @@ def _sync_node_to_sqlite(node_id: str, node_info: dict, user_id: str = ""):
                     python_version = CASE WHEN excluded.python_version != '' THEN excluded.python_version ELSE edge_nodes.python_version END,
                     cpu_count = CASE WHEN excluded.cpu_count != 0 THEN excluded.cpu_count ELSE edge_nodes.cpu_count END,
                     memory_total_mb = CASE WHEN excluded.memory_total_mb != 0 THEN excluded.memory_total_mb ELSE edge_nodes.memory_total_mb END,
+                    version = CASE WHEN excluded.version != '' THEN excluded.version ELSE edge_nodes.version END,
                     last_seen = excluded.last_seen
             """, (node_id, node_name, node_type, status, ip_address,
                   metadata, frameworks, ide_tools, user_id,
                   hostname, os_name, os_version, python_version,
-                  cpu_count, memory_total_mb, now, now))
+                  cpu_count, memory_total_mb, version, now, now))
     except Exception:
         pass  # Don't break registration if SQLite write fails
 
@@ -339,7 +343,7 @@ async def health_report(request: Request):
 
     # Update system info in registry if provided in health report
     system_info_fields = ["hostname", "ip_address", "os", "os_version",
-                          "python_version", "cpu_count", "memory_total_mb"]
+                          "python_version", "cpu_count", "memory_total_mb", "version"]
     has_system_info = any(body.get(f) for f in system_info_fields)
     if has_system_info:
         node = registry.get_node(node_id)
@@ -347,7 +351,7 @@ async def health_report(request: Request):
             update = {}
             for field in system_info_fields:
                 val = body.get(field)
-                if val:
+                if val is not None and val != "":
                     update[field] = val
             if update:
                 with registry._lock:
@@ -363,8 +367,12 @@ async def health_report(request: Request):
     )
 
     # Sync system info to SQLite if provided
-    if has_system_info:
-        sys_info = {f: body.get(f) for f in system_info_fields if body.get(f)}
+    sys_info = {}
+    for field in system_info_fields:
+        val = body.get(field)
+        if val is not None and val != "":
+            sys_info[field] = val
+    if sys_info:
         sys_info["status"] = "online"
         _sync_node_to_sqlite(node_id, sys_info)
 
