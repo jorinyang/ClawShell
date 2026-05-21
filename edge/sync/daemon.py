@@ -331,6 +331,12 @@ class EdgeSyncDaemon:
 
     def _sync_cycle(self) -> dict:
         """Execute one complete sync cycle."""
+
+        # Check for pending upgrade restart
+        if self._check_pending_restart():
+            self._running = False  # Signal loop to exit gracefully
+            return {"skipped": True, "reason": "upgrade_restart"}
+
         # Pre-sync hook: allow cancellation
         if trigger_hook is not None:
             try:
@@ -591,8 +597,12 @@ class EdgeSyncDaemon:
         return False
 
     def _apply_upgrade(self, target_version: str) -> bool:
-        """Apply upgrade to target version via git pull + pip install."""
-        import logging, subprocess
+        """Apply upgrade to target version via git pull + pip install.
+
+        After applying, signals a pending restart so the daemon can be
+        restarted by an external supervisor (systemd/service manager).
+        """
+        import logging, subprocess, json
         logger = logging.getLogger("edge.sync.upgrade")
         edge_repo = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 
@@ -615,19 +625,37 @@ class EdgeSyncDaemon:
                 logger.warning("pip install failed: %s", r2.stderr.strip())
                 return False
 
-            # 3. Update __version__.py to match
-            version_file = os.path.join(edge_repo, "edge", "__version__.py")
-            try:
-                with open(version_file, "w") as f:
-                    f.write(f'"""ClawShell Edge version."""\n__version__ = "{target_version}"\n__edge_name__ = "ClawShell Edge"\n')
-            except Exception:
-                pass
+            # 3. Write pending-upgrade flag so daemon loop knows to restart
+            flag_file = os.path.join(self._data_dir, "pending_upgrade.json")
+            with open(flag_file, "w") as f:
+                json.dump({"version": target_version, "applied_at": time.time()}, f)
 
-            logger.info("Upgrade to v%s applied successfully", target_version)
+            logger.info("Upgrade to v%s applied, daemon restart pending", target_version)
             return True
 
         except Exception as e:
             logger.error("Upgrade failed: %s", e)
+            return False
+
+    def _check_pending_restart(self) -> bool:
+        """Check if a pending upgrade flag exists and initiate graceful restart.
+
+        Returns True if restart was initiated (daemon should exit).
+        """
+        flag_file = os.path.join(self._data_dir, "pending_upgrade.json")
+        if not os.path.exists(flag_file):
+            return False
+
+        try:
+            import json
+            with open(flag_file) as f:
+                data = json.load(f)
+            logger = __import__("logging").getLogger("edge.sync.upgrade")
+            logger.info("Pending upgrade to v%s detected — initiating graceful restart", data.get("version"))
+            # Remove flag so we don't loop
+            os.remove(flag_file)
+            return True
+        except Exception:
             return False
 
     # ── System Info ────────────────────────────────────
