@@ -143,7 +143,6 @@ def create_app() -> FastAPI:
     # ── v2.1 CronSupervisor Router ─────────────────────
     from cloud.routers.cron_supervisor import router as cron_supervisor_router
     app.include_router(cron_supervisor_router, prefix="/api/v1")
-
     # ── v2.0 Auth & Admin Routers ────────────────────
     from cloud.routers.auth import router as auth_router
     from cloud.routers.admin import router as admin_router
