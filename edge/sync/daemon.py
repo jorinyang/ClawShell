@@ -218,6 +218,7 @@ class EdgeSyncDaemon:
     HEALTH_EVERY_N = 10  # Report health every 10 cycles
     TOKEN_REFRESH_EVERY_N = 120  # Refresh token every 120 cycles (~10 min)
     CRED_SYNC_EVERY_N = 60  # Sync credentials every 60 cycles (~5 min)
+    UPGRADE_CHECK_EVERY_N = 360  # Check for upgrades every 360 cycles (~30 min)
 
     def __init__(self, cloud_url: str, edge_token: str = "",
                  edge_id: str = "", data_dir: str = "~/.clawshell-edge"):
@@ -411,6 +412,10 @@ class EdgeSyncDaemon:
                 # Only poll if WebSocket is not connected
                 self._sync_credentials()
 
+        # 9. Auto-upgrade check (every N cycles, ~30 min)
+        if self._stats["cycles"] % self.UPGRADE_CHECK_EVERY_N == 0:
+            self._check_and_upgrade()
+
         # Post-sync hook
         if trigger_hook is not None:
             try:
@@ -522,21 +527,108 @@ class EdgeSyncDaemon:
     # ── Version ────────────────────────────────────
 
     def _get_edge_version(self) -> str:
-        """Get edge/ClawShell version for health reporting."""
-        import re
+        """Get ClawShell Edge version for health reporting."""
+        import os
         try:
-            import subprocess
-            result = subprocess.run(
-                ["hermes", "--version"],
-                capture_output=True, text=True, timeout=5
-            )
-            if result.returncode == 0:
-                m = re.search(r"v(\d+\.\d+\.\d+)", result.stdout)
-                if m:
-                    return m.group(1)
+            version_file = os.path.join(os.path.dirname(__file__), "..", "__version__.py")
+            with open(version_file) as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith("__version__"):
+                        return line.split("=")[1].strip().strip('"').strip("'")
         except Exception:
             pass
         return "unknown"
+
+    # ── Auto Upgrade ─────────────────────────────────
+
+    def _check_and_upgrade(self) -> bool:
+        """Check for newer ClawShell Edge version and auto-upgrade if available.
+
+        Returns True if an upgrade was performed, False otherwise.
+        """
+        import logging
+        logger = logging.getLogger("edge.sync.upgrade")
+
+        current_version = self._get_edge_version()
+        if current_version == "unknown":
+            logger.debug("Cannot determine current version for upgrade check")
+            return False
+
+        try:
+            # Fetch latest version from GitHub releases
+            import urllib.request
+            url = "https://api.github.com/repos/jorinyang/ClawShell/releases/latest"
+            req = urllib.request.Request(url, headers={"Accept": "application/json"})
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = __import__("json").loads(resp.read())
+            latest = data.get("tag_name", "").lstrip("v")
+            if not latest:
+                return False
+
+            # Compare versions (simple semver comparison)
+            def parse_ver(v):
+                return tuple(int(x) for x in v.split(".")[:3])
+
+            if parse_ver(latest) > parse_ver(current_version):
+                logger.info(
+                    "Newer ClawShell Edge version available: %s (current: %s)",
+                    latest, current_version
+                )
+                # Download and apply upgrade
+                upgrade_ok = self._apply_upgrade(latest)
+                if upgrade_ok:
+                    logger.info("Auto-upgrade to v%s completed", latest)
+                    return True
+                else:
+                    logger.warning("Auto-upgrade failed, continuing with v%s", current_version)
+            else:
+                logger.debug("Edge v%s is up to date (latest: v%s)", current_version, latest)
+
+        except Exception as e:
+            logger.debug("Upgrade check failed: %s", e)
+
+        return False
+
+    def _apply_upgrade(self, target_version: str) -> bool:
+        """Apply upgrade to target version via git pull + pip install."""
+        import logging, subprocess
+        logger = logging.getLogger("edge.sync.upgrade")
+        edge_repo = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+
+        try:
+            # 1. Git pull latest
+            r1 = subprocess.run(
+                ["git", "pull", "origin", "main"],
+                cwd=edge_repo, capture_output=True, text=True, timeout=60
+            )
+            if r1.returncode != 0:
+                logger.warning("git pull failed: %s", r1.stderr.strip())
+                return False
+
+            # 2. pip install -e . to pick up any dependency changes
+            r2 = subprocess.run(
+                ["pip", "install", "-e", ".", "--quiet"],
+                cwd=edge_repo, capture_output=True, text=True, timeout=120
+            )
+            if r2.returncode != 0:
+                logger.warning("pip install failed: %s", r2.stderr.strip())
+                return False
+
+            # 3. Update __version__.py to match
+            version_file = os.path.join(edge_repo, "edge", "__version__.py")
+            try:
+                with open(version_file, "w") as f:
+                    f.write(f'"""ClawShell Edge version."""\n__version__ = "{target_version}"\n__edge_name__ = "ClawShell Edge"\n')
+            except Exception:
+                pass
+
+            logger.info("Upgrade to v%s applied successfully", target_version)
+            return True
+
+        except Exception as e:
+            logger.error("Upgrade failed: %s", e)
+            return False
 
     # ── System Info ────────────────────────────────────
 
