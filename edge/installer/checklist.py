@@ -4,6 +4,41 @@ import os, sys, textwrap
 from pathlib import Path
 from typing import Callable, Optional
 
+# ── LLM Model → Provider Auto-Detection ───────────────────────────────
+
+# Provider defaults per model prefix (order matters: check most specific first)
+LLM_PROVIDER_MAP: list[tuple[str, str, str]] = [
+    # (model_prefix, provider, endpoint)
+    ("deepseek",          "deepseek",  "https://api.deepseek.com/v1"),
+    ("gpt-",              "openai",    "https://api.openai.com/v1"),
+    ("o1-",               "openai",    "https://api.openai.com/v1"),
+    ("o3-",               "openai",    "https://api.openai.com/v1"),
+    ("MiniMax-",          "minimax",   "https://api.minimax.chat/v1"),
+    ("minimax-",          "minimax",   "https://api.minimax.chat/v1"),
+    ("claude-",           "anthropic", "https://api.anthropic.com/v1"),
+    ("anthropic/",        "anthropic", "https://api.anthropic.com/v1"),
+]
+
+LLM_DEFAULT_MODEL = "deepseek-v4-pro"
+LLM_KEY_ENV_MAP: dict[str, str] = {
+    "deepseek":  "DEEPSEEK_API_KEY",
+    "openai":    "OPENAI_API_KEY",
+    "anthropic": "ANTHROPIC_API_KEY",
+    "minimax":   "MINIMAX_API_KEY",
+}
+
+def _detect_provider_from_model(model: str) -> tuple[str, str]:
+    """Infer (provider, endpoint) from model name prefix. Falls back to deepseek."""
+    model_lower = model.lower()
+    for prefix, provider, endpoint in LLM_PROVIDER_MAP:
+        if model_lower.startswith(prefix.lower()):
+            return provider, endpoint
+    return "deepseek", "https://api.deepseek.com/v1"
+
+def _key_env_for_provider(provider: str) -> str:
+    """Return the environment variable name for a given provider."""
+    return LLM_KEY_ENV_MAP.get(provider, "DEEPSEEK_API_KEY")
+
 # ── Checklist ─────────────────────────────────────────────────────────
 
 class InstallationChecklist:
@@ -93,25 +128,21 @@ class InstallationChecklist:
         return "skipped"
 
     def _prompt_llm_key(self) -> str | bool:
-        val = os.environ.get("DEEPSEEK_API_KEY", os.environ.get("OPENAI_API_KEY", ""))
-        if val:
-            return "*** (from env)"
+        # Check all known env vars
+        for env_var in ("DEEPSEEK_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "MINIMAX_API_KEY"):
+            val = os.environ.get(env_var, "")
+            if val:
+                return "*** (from env)"
         if self.interactive:
-            provider = input("  Provider [deepseek/openai, default: deepseek]: ").strip() or "deepseek"
-            model = input("  Model [default: deepseek-chat]: ").strip()
+            model = input("  Model [default: deepseek-v4-pro]: ").strip()
             if not model:
-                model = "deepseek-chat" if provider == "deepseek" else "gpt-4o"
+                model = "deepseek-v4-pro"
+            provider, endpoint = _detect_provider_from_model(model)
             ans = input("  API Key [sk-xxx]: ").strip()
-            # Auto-detect endpoint from provider
-            endpoint_defaults = {
-                "deepseek": "https://api.deepseek.com/v1",
-                "openai": "https://api.openai.com/v1",
-            }
-            endpoint = endpoint_defaults.get(provider, "https://api.deepseek.com/v1")
             self.values["llm_provider"] = provider
             self.values["llm_model"] = model
             self.values["llm_endpoint"] = endpoint
-            self.values["llm_api_key_env"] = "DEEPSEEK_API_KEY" if provider == "deepseek" else "OPENAI_API_KEY"
+            self.values["llm_api_key_env"] = _key_env_for_provider(provider)
             if ans:
                 self.values["llm_api_key_raw"] = ans
                 return f"{provider}/{model} *** (provided)"

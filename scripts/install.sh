@@ -199,15 +199,16 @@ CLAWSHELL_CLOUD_URL=$CLOUD_URL
 CLAWSHELL_NODE_ID=edge-$(hostname 2>/dev/null || echo "unknown")
 
 # ── LLM Configuration ──────────────────────
-# Provider: deepseek | openai
+# Model: deepseek-v4-pro | MiniMax-M2.7-highspeed | gpt-4o | claude-sonnet-4
+# Provider + Endpoint auto-detected from model name prefix
+LLM_MODEL=deepseek-v4-pro
 LLM_PROVIDER=deepseek
-# Endpoint URL
 LLM_ENDPOINT=https://api.deepseek.com/v1
-# Model name
-LLM_MODEL=deepseek-chat
-# API Key (set one):
+# API Key (set one matching provider):
 # DEEPSEEK_API_KEY=sk-xxx
 # OPENAI_API_KEY=sk-xxx
+# ANTHROPIC_API_KEY=sk-ant-xxx
+# MINIMAX_API_KEY=sk-xxx
 
 # ── Memory Plugin ──────────────────────────
 # MEMOS_API_KEY=mpg-xxx

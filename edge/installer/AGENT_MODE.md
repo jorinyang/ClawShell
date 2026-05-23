@@ -30,19 +30,20 @@ To install ClawShell Edge, I need 2 API keys:
 1. MemOS Cloud API Key → Register at https://memos.cloud
    Format: mpg-xxxxxxxxxxxx
 
-2. LLM Configuration (provider + model + key, endpoint auto-matched):
+2. LLM Configuration (model name auto-detects provider + endpoint):
 
-   **DeepSeek (推荐):**
-   - Model: deepseek-chat / deepseek-reasoner
-   - Endpoint: https://api.deepseek.com/v1 (auto)
+   **Default: deepseek-v4-pro**
+   - Provider: deepseek (auto)  |  Endpoint: https://api.deepseek.com/v1 (auto)
    - API Key: https://platform.deepseek.com/api_keys
 
-   **OpenAI:**
-   - Model: gpt-4o / gpt-4o-mini
-   - Endpoint: https://api.openai.com/v1 (auto)
-   - API Key: https://platform.openai.com/api-keys
+   **Alternative: MiniMax-M2.7-highspeed**
+   - Provider: minimax (auto)  |  Endpoint: https://api.minimax.chat/v1 (auto)
 
-Please provide: provider, model, and API Key (or say "skip").
+   **Other supported models (auto-detected by prefix):**
+   - deepseek-* → deepseek     |  gpt-* / o1-* / o3-* → openai
+   - claude-* → anthropic       |  MiniMax-* → minimax
+
+Please provide: model name and API Key (or say "skip").
 
 Please provide both keys (or say "skip" for either).
 ```
