@@ -149,6 +149,9 @@ def create_app() -> FastAPI:
     # ── Vault Router (Obsidian knowledge vault) ─────
     from cloud.routers.vault import router as vault_router
     app.include_router(vault_router, prefix="/api/v1")
+# ── MCP Status Router ─────────────────────────
+    from cloud.routers.mcp import router as mcp_router
+    app.include_router(mcp_router, prefix="/api/v1")
 
     # ── v2.0 Auth & Admin Routers ────────────────────
     from cloud.routers.auth import router as auth_router
