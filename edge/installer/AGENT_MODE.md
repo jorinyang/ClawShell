@@ -30,10 +30,19 @@ To install ClawShell Edge, I need 2 API keys:
 1. MemOS Cloud API Key → Register at https://memos.cloud
    Format: mpg-xxxxxxxxxxxx
 
-2. LLM API Key (DeepSeek or OpenAI)
-   DeepSeek: https://platform.deepseek.com/api_keys
-   OpenAI: https://platform.openai.com/api-keys
-   Format: sk-xxxxxxxxxxxx (or ds-xxx)
+2. LLM Configuration (provider + model + key, endpoint auto-matched):
+
+   **DeepSeek (推荐):**
+   - Model: deepseek-chat / deepseek-reasoner
+   - Endpoint: https://api.deepseek.com/v1 (auto)
+   - API Key: https://platform.deepseek.com/api_keys
+
+   **OpenAI:**
+   - Model: gpt-4o / gpt-4o-mini
+   - Endpoint: https://api.openai.com/v1 (auto)
+   - API Key: https://platform.openai.com/api-keys
+
+Please provide: provider, model, and API Key (or say "skip").
 
 Please provide both keys (or say "skip" for either).
 ```
@@ -41,10 +50,15 @@ Please provide both keys (or say "skip" for either).
 Store the keys in environment variables:
 ```bash
 export MEMOS_API_KEY="mpg-xxxx"
-export DEEPSEEK_API_KEY="sk-xxxx"
+export LLM_PROVIDER="deepseek"
+export LLM_ENDPOINT="https://api.deepseek.com/v1"
+export LLM_MODEL="deepseek-chat"
+export DEEPSEEK_API_KEY="sk-xxxx"    # if using DeepSeek
+# or
+export OPENAI_API_KEY="sk-xxxx"      # if using OpenAI
 ```
 
-If user says "skip" for LLM key: ClawShell will use built-in model. Proceed with warning.
+If user says "skip" for LLM: ClawShell uses CloudHub's built-in Brain LLM. Proceed with warning.
 If user says "skip" for MemOS key: memory sync is disabled. Proceed with warning.
 
 **[OK] Phase 1 complete** — credentials collected.
@@ -165,7 +179,15 @@ cat > ~/.clawshell/.env << EOF
 CLAWSHELL_HOME=$HOME/.clawshell
 CLAWSHELL_CLOUD_URL=http://47.239.71.174:8000
 CLAWSHELL_NODE_ID=edge-$(hostname)
+
+# LLM Configuration
+LLM_PROVIDER=${LLM_PROVIDER:-deepseek}
+LLM_ENDPOINT=${LLM_ENDPOINT:-https://api.deepseek.com/v1}
+LLM_MODEL=${LLM_MODEL:-deepseek-chat}
 DEEPSEEK_API_KEY=$DEEPSEEK_API_KEY
+# or: OPENAI_API_KEY=$OPENAI_API_KEY
+
+# Memory
 MEMOS_API_KEY=$MEMOS_API_KEY
 EOF
 ```

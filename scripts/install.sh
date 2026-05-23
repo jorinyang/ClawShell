@@ -197,8 +197,19 @@ if [ ! -f "$ENV_FILE" ]; then
 CLAWSHELL_HOME=$CLAWSHELL_HOME
 CLAWSHELL_CLOUD_URL=$CLOUD_URL
 CLAWSHELL_NODE_ID=edge-$(hostname 2>/dev/null || echo "unknown")
-# Set your keys:
+
+# ── LLM Configuration ──────────────────────
+# Provider: deepseek | openai
+LLM_PROVIDER=deepseek
+# Endpoint URL
+LLM_ENDPOINT=https://api.deepseek.com/v1
+# Model name
+LLM_MODEL=deepseek-chat
+# API Key (set one):
 # DEEPSEEK_API_KEY=sk-xxx
+# OPENAI_API_KEY=sk-xxx
+
+# ── Memory Plugin ──────────────────────────
 # MEMOS_API_KEY=mpg-xxx
 EEOF
 fi

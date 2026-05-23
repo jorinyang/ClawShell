@@ -97,10 +97,24 @@ class InstallationChecklist:
         if val:
             return "*** (from env)"
         if self.interactive:
-            ans = input("  LLM API Key [sk-xxx]: ").strip()
+            provider = input("  Provider [deepseek/openai, default: deepseek]: ").strip() or "deepseek"
+            model = input("  Model [default: deepseek-chat]: ").strip()
+            if not model:
+                model = "deepseek-chat" if provider == "deepseek" else "gpt-4o"
+            ans = input("  API Key [sk-xxx]: ").strip()
+            # Auto-detect endpoint from provider
+            endpoint_defaults = {
+                "deepseek": "https://api.deepseek.com/v1",
+                "openai": "https://api.openai.com/v1",
+            }
+            endpoint = endpoint_defaults.get(provider, "https://api.deepseek.com/v1")
+            self.values["llm_provider"] = provider
+            self.values["llm_model"] = model
+            self.values["llm_endpoint"] = endpoint
+            self.values["llm_api_key_env"] = "DEEPSEEK_API_KEY" if provider == "deepseek" else "OPENAI_API_KEY"
             if ans:
                 self.values["llm_api_key_raw"] = ans
-                return "*** (provided)"
+                return f"{provider}/{model} *** (provided)"
         return "skipped"
 
     def _prompt_install_dir(self) -> str:
