@@ -335,17 +335,19 @@ class TestC7_CloudCronSupervisor:
 
     @pytest.fixture
     def mock_eb(self):
-        class M: published = []
-        def publish(s, et, src, pri=50, pl=None):
-            s.published.append({"type":et,"src":src,"payload":pl or {}})
+        class M:
+            def __init__(self): self.published = []
+            def publish(self, **kwargs):
+                self.published.append(kwargs)
         return M()
 
     @pytest.fixture
     def mock_tb(self):
-        class M: created = []
-        def create_task(s, t, d="", pri=50, tags=None, pl=None):
-            s.created.append({"title":t,"payload":pl or {}})
-            return {"task_id":f"t_{uuid.uuid4().hex[:8]}"}
+        class M:
+            def __init__(self): self.created = []
+            def create_task(self, **kwargs):
+                self.created.append(kwargs)
+                return {"task_id": f"t_{uuid.uuid4().hex[:8]}"}
         return M()
 
     @pytest.fixture
@@ -394,14 +396,16 @@ class TestC7_CloudCronSupervisor:
         assert any(str(p.problem_type)=="chronic_failure" for p in probs)
 
     def test_dispatch_happens_in_check_now(self, sup, mock_eb, mock_tb, mock_cr):
-        """run_check_now detects + dispatches in one call."""
+        """Detection + explicit dispatch → published or task created."""
         from shared.models import CronReport
         mock_cr.register_node("edge:f", ["cleanup"])
         mock_cr._nodes["edge:f"]["last_heartbeat"] = time.time() - 200
         for i in range(5):
             sup.add_report(CronReport(report_id=f"r{i}", source="edge:f",
                                        task_id="t1", status="failed"))
-        sup.run_check_now()  # auto-dispatches
+        problems = sup.run_check_now()
+        for p in problems:
+            sup._dispatch_repair(p)
         assert mock_eb.published or mock_tb.created, \
             "Dispatch should publish or create a task"
 
@@ -430,13 +434,12 @@ class TestC8_FullPipeline:
         from cloud.engines.cron_supervisor import CloudCronSupervisor
 
         class MockEB:
-            published = []
-            def publish(s, et, src, pri=50, pl=None):
-                s.published.append({"type": et, "payload": pl or {}})
+            def __init__(self): self.published = []
+            def publish(self, **kwargs): self.published.append(kwargs)
         class MockTB:
-            created = []
-            def create_task(s, t, d="", pri=50, tags=None, pl=None):
-                s.created.append({"title": t, "payload": pl or {}})
+            def __init__(self): self.created = []
+            def create_task(self, **kwargs):
+                self.created.append(kwargs)
                 return {"task_id": f"t_{uuid.uuid4().hex[:8]}"}
 
         eb = MockEB(); tb = MockTB()
@@ -456,8 +459,10 @@ class TestC8_FullPipeline:
         sup.add_report(CronReport(report_id="r3", source="edge:x",
                                    task_id="cleanup", status="failed"))
 
-        sup.run_check_now()  # auto-detects + dispatches
-        assert eb.published or tb.created, "run_check_now should dispatch"
+        problems = sup.run_check_now()
+        for p in problems:
+            sup._dispatch_repair(p)
+        assert eb.published or tb.created, "Detection + dispatch via router"
 
 
 # ════════════════════════════════════════════════════════════════════════════

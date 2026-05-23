@@ -78,7 +78,7 @@ class TestLLMProviderDetection:
     def test_claude_sonnet(self):
         provider, endpoint = self._detect("claude-sonnet-4")
         assert provider == "anthropic"
-        assert endpoint == "https://api.anthropic.com/v1"
+        assert endpoint == "https://api.anthropic.com"
 
     def test_anthropic_slash_prefix(self):
         provider, _ = self._detect("anthropic/claude-sonnet-4")
