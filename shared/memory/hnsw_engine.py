@@ -146,7 +146,7 @@ class HNSWVectorMemory:
         self.config = config or HNSWConfig()
         self.config.validate()
 
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self._metadata: Dict[str, dict] = {}          # id -> metadata
         self._id_to_label: Dict[str, int] = {}        # id -> internal label
         self._label_to_id: Dict[int, str] = {}        # internal label -> id
@@ -495,7 +495,7 @@ class HNSWVectorMemory:
 
         instance = cls.__new__(cls)
         instance.config = config
-        instance._lock = threading.Lock()
+        instance._lock = threading.RLock()
         instance._metadata = meta_payload['metadata']
         instance._id_to_label = meta_payload['id_to_label']
         instance._label_to_id = {int(k): v for k, v in meta_payload['label_to_id'].items()}

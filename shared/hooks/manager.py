@@ -95,7 +95,7 @@ class HookManager:
     def __init__(self) -> None:
         self._hooks: Dict[str, HookEntry] = {}
         self._event_index: Dict[HookEvent, List[str]] = {e: [] for e in HookEvent}
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
 
     # -- registration -------------------------------------------------------
 

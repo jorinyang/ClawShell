@@ -137,7 +137,7 @@ class OfflineQueue:
 
     def __init__(self, filepath: str):
         self._filepath = filepath
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self._queue: List[dict] = []
         self._load()
 

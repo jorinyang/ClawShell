@@ -1815,41 +1815,41 @@ print("  CATEGORY 18: v1.10.0 — MemoryStore + RepairEscalation")
 print("=" * 60)
 
 tmp18 = tempfile.mkdtemp(prefix="cs_v1100_")
-from storage.memory_store import MemoryStore
+# storage memory_store deleted (dead code v2.2)
 from exoskeleton.layer2.repair_escalation import RepairEscalation
 from shared.models import RepairLayer
 
 # MemoryStore
-ms = MemoryStore(store_path=tmp18)
-check("MemoryStore created", ms is not None)
+ms = type("x",(),{})()  # dummy
+# SKIPPED (dead module): # SKIPPED: check("MemoryStore created", ms is not None)
 
-ms.store_dict("m1", "hello world test", importance=0.8, category="session", tags=["test"])
-ms.store_dict("m2", "python programming", importance=0.5, category="knowledge", tags=["python"])
-ms.store_dict("m3", "important reminder", importance=0.9, category="session", tags=["important"])
+# SKIPPED (dead module): # SKIPPED: ms.store_dict("m1", "hello world test", importance=0.8, category="session", tags=["test"])
+# SKIPPED (dead module): # SKIPPED: ms.store_dict("m2", "python programming", importance=0.5, category="knowledge", tags=["python"])
+# SKIPPED (dead module): # SKIPPED: ms.store_dict("m3", "important reminder", importance=0.9, category="session", tags=["important"])
 
-recalled = ms.recall("hello", limit=10)
-check("MemoryStore.recall hello", len(recalled) >= 1)
+# SKIPPED (dead module): # SKIPPED: recalled = ms.recall("hello", limit=10)
+# SKIPPED (dead module): # SKIPPED: check("MemoryStore.recall hello", len(recalled) >= 1)
 
-recalled_all = ms.recall("", limit=10)
-check("MemoryStore.recall all", len(recalled_all) >= 3)
+# SKIPPED (dead module): # SKIPPED: recalled_all = ms.recall("", limit=10)
+# SKIPPED (dead module): # SKIPPED: check("MemoryStore.recall all", len(recalled_all) >= 3)
 
 # Get specific
-m1 = ms.get("m1")
-check("MemoryStore.get m1", m1 is not None)
-check("MemoryStore.get content", "hello" in m1.content)
+# SKIPPED (dead module): # SKIPPED: m1 = ms.get("m1")
+# SKIPPED (dead module): # SKIPPED: check("MemoryStore.get m1", m1 is not None)
+# SKIPPED (dead module): # SKIPPED (dead module): # SKIPPED: check("MemoryStore.get content", "hello" in m1.content)
 
 # Forget
-check("MemoryStore.forget m3", ms.forget("m3"))
-check("MemoryStore.get deleted", ms.get("m3") is None)
+# SKIPPED (dead module): # SKIPPED (dead module): # SKIPPED: check("MemoryStore.forget m3", ms.forget("m3"))
+# SKIPPED (dead module): # SKIPPED (dead module): # SKIPPED: check("MemoryStore.get deleted", ms.get("m3") is None)
 
 # Stats
-ms_stats = ms.stats
-check("MemoryStore.stats.total", ms_stats["total"] >= 2)
+# SKIPPED (dead module): # SKIPPED: ms_stats = ms.stats
+# SKIPPED (dead module): # SKIPPED: check("MemoryStore.stats.total", ms_stats["total"] >= 2)
 
 # Load from disk
-ms2 = MemoryStore(store_path=tmp18)
-count = ms2.load()
-check("MemoryStore.load loads persisted", count >= 2)
+ms2 = type("x",(),{})()  # dummy
+# SKIPPED (dead module): count = ms2.load()
+# SKIPPED (dead module): # SKIPPED: check("MemoryStore.load loads persisted", count >= 2)
 
 # RepairEscalation
 esc = RepairEscalation()
@@ -2059,7 +2059,7 @@ ins2 = PydanticInsight(insight_id="i1", title="Pattern Found", content="Multiple
 check("Insight → actionable", ins2.actionable and ins2.action is not None)
 
 # MemoryStore ↔ decay formula
-ms3 = MemoryStore(store_path=tempfile.mkdtemp(prefix="cs_integ_"))
+ms3 = None
 ms3.store_dict("old", "old memory", importance=0.9)
 ms3.store_dict("new", "new memory", importance=0.5)
 recalled_decay = ms3.recall("memory", limit=10)

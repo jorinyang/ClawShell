@@ -143,7 +143,7 @@ class TrustEvaluator:
     W_INTEGRITY: float = 0.2
 
     def __init__(self, persistence_path: Optional[str] = None) -> None:
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self._persistence_path = persistence_path
 
         # Per-node state

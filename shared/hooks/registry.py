@@ -25,7 +25,7 @@ from .manager import HookContext, HookEvent, HookManager
 # ---------------------------------------------------------------------------
 
 _instance: Optional[HookManager] = None
-_lock = threading.Lock()
+_lock = threading.RLock()
 
 
 def get_hook_manager() -> HookManager:
