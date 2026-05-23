@@ -207,6 +207,11 @@ def init_engines():
     _swarm.start_monitor()
 
     _broadcast = BroadcastEngine(data_dir=config.data_dir, eventbus=_eventbus)
+    # v2.3 — ReportEngine (unified review + broadcast)
+    from cloud.engines.report_engine import ReportEngine
+    _report_engine = ReportEngine(data_dir=config.data_dir, eventbus=_eventbus, skill_market=_skill_market)
+    _report_engine.start()
+
 
     _evolution = EvolutionEngine(
         data_dir=config.data_dir, eventbus=_eventbus, skill_market=_skill_market
