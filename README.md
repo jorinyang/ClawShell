@@ -2,7 +2,7 @@
 
 > **一云多端云边协同分布式神经系统** | Multi-Account · Cloud Dashboard · Credential Sync
 >
-> Version 2.0.0 | CloudHub (云枢) + Edge Brain (端脑) + Dashboard (控制台) | Engineering Cybernetics | 智询工作室
+> Version 2.2.0 | CloudHub (云枢) + Edge Brain (端脑) + Dashboard (控制台) | Engineering Cybernetics | 智询工作室
 >
 > 🌐 **官网:** [https://clawshell.club](https://clawshell.club) · **管理后台:** [https://cloud.clawshell.club](https://cloud.clawshell.club)
 
@@ -87,29 +87,44 @@
 
 ### 云侧部署 (CloudHub + Dashboard)
 
-```bash
-git clone https://github.com/jorinyang/ClawShell.git
-cd ClawShell
-docker compose up -d
-# CloudHub API: http://localhost:8000
-# Dashboard:    http://localhost:3000
-# 默认管理员: core_admin / clawshell
-```
+### 🤖 Agent 模式 — 对 AI Agent 说一句话即可安装
 
-### 端侧安装 (Edge Brain)
+**用户只需对任意 AI Agent (Claude Code / Hermes / Codex) 说：**
+
+> "安装 ClawShell"
+
+Agent 会自动：
+1. 读取 [AGENT_MODE.md](edge/installer/AGENT_MODE.md) 安装指引
+2. 检测系统环境（OS / Python / Git / 现有 Agent）
+3. **唯一暂停**：向用户索要 2 个 API Key（MemOS + LLM）
+4. 克隆仓库、安装依赖、注入 Agent 配置
+5. 执行自检并生成安装报告
+
+**人类角色**：仅提供凭证。Agent 负责全部安装动作。
+
+### 命令行模式 — 一键安装
 
 ```bash
+# Linux / macOS / WSL
 curl -fsSL https://clawshell.club/install.sh | bash
-# 交互式引导: 选择框架 → 配置 CloudHub 地址 → 自动注册
+
+# Agent 静默模式 (JSON 输出，供 Agent 调用)
+curl -fsSL https://clawshell.club/install.sh | bash -s -- --agent
 ```
 
-### 本地开发
+### Windows
+
+```powershell
+iwr https://clawshell.club/install.ps1 | iex
+```
+
+### 手动安装 (开发者)
 
 ```bash
-git clone https://github.com/jorinyang/ClawShell.git
-cd ClawShell
-pip install -e ".[cloud,edge]"
-cd dashboard && npm install && npm run dev
+git clone https://github.com/jorinyang/ClawShell.git ~/.clawshell
+cd ~/.clawshell
+pip install pyyaml requests aiohttp websockets
+python3 -m edge.installer check  # 自检
 ```
 
 ---
@@ -120,7 +135,7 @@ cd dashboard && npm install && npm run dev
 
 | 模块 | 数量 | 说明 |
 |------|------|------|
-| Core Engines | **15** | EventBus · TaskBoard · SkillMarket · CapRegistry · SwarmCoord · CronSched · Evolution · Review · Broadcast · N8N · Workflow · Optimizer · DeepThink · **CredentialMgr** · **AuditEngine** |
+| Core Engines | **19** | EventBus · TaskBoard · SkillMarket · CapRegistry · SwarmCoord · CronSched · Evolution · Review · Broadcast · N8N · Workflow · Optimizer · DeepThink · CredentialMgr · AuditEngine · KnowledgeGraph · PubSub · **CloudCronSupervisor** · **DispatchRouter** |
 | Event Sourcing | **9** | Store · Tracer · DeadLetterQ · PriorityQ · Aggregator · Metrics · PatternMiner · MLEngine · QualityEvaluator |
 | MCP Protocol | 3 | MCPHub · JWT Auth · 7-Domain Router |
 | Services | **6** | VaultAPI · OSSSync · MemOS · KnowledgeGraph · **CredentialSync** · **AccountService** |
@@ -132,6 +147,7 @@ cd dashboard && npm install && npm run dev
 | L1-L4 外骨骼 | 4 层 | 自感知 → 自适应 → 自组织 → 多Agent集群 |
 | 健康检测器 | **8** | System · Disk · Process · Network · Service · Agent · Gateway · Framework |
 | IDE 桥接器 | **6** | Codex · Claude · Kimi · DeepSeek · Copilot · Windsurf |
+| **Installer (v2.2)** | **1** | 一键安装 · Agent 模式 · 自动检测OS/Agent/IDE · 配置注入 · 自检报告 |
 | Sync Daemon | 1 | 5s 循环: scan→enqueue→flush→pull→health |
 | Edge Gateway | 4 | NetworkDiscovery · DeviceMonitor · KnowledgePuller · SelfHealing |
 
