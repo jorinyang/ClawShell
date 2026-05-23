@@ -33,3 +33,6 @@ def detect_ide_tools() -> list[str]:
         if bridge.detect():
             available.append(bridge.get_name())
     return available
+from edge.ide_bridge.kimi_code import KimiBridge
+from edge.ide_bridge.copilot import CopilotBridge
+from edge.ide_bridge.windsurf import WindsurfBridge

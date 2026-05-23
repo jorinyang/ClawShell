@@ -34,6 +34,13 @@ class SelfRepairEngine:
         self.FIX_ACTIONS["restart_daemons"] = self._restart_daemons
         self.FIX_ACTIONS["clear_cache"] = self._clear_cache
         self.FIX_ACTIONS["rotate_logs"] = self._rotate_logs
+    # v2.2: Robust controller for disturbance tolerance
+    try:
+        from exoskeleton.layer2.robust_controller import RobustController
+        FIX_ACTIONS["robust_control"] = lambda: RobustController().compute_fix()
+    except ImportError:
+        pass
+
 
     def detect_issues(self) -> List[dict]:
         """Detect system issues."""
