@@ -131,6 +131,14 @@ python3 -m edge.installer check  # 自检
 
 ## 架构总览
 
+### 🗺️ 架构全景图
+
+| 图表 | 链接 | 说明 |
+|------|------|------|
+| **系统架构全景** | [clawshell.club/#architecture](https://clawshell.club/#architecture) · [独立页面](https://clawshell.club/architecture.html) | 19 引擎 + 35 边缘组件，云边全貌 |
+| **业务架构图** | [clawshell.club/#biz-arch](https://clawshell.club/#biz-arch) · [独立页面](https://clawshell.club/ClawShell_Business_Architecture.html) | 用户角色→接入渠道→业务能力→基础设施 |
+| **数据关系图** | [独立页面](https://clawshell.club/ClawShell_Data_Relationship.html) | 数据源→存储层→同步→消费端，完整数据流 |
+
 ### CloudHub (云枢)
 
 | 模块 | 数量 | 说明 |
