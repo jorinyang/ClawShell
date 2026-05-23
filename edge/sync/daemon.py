@@ -218,6 +218,7 @@ class EdgeSyncDaemon:
     HEALTH_EVERY_N = 10  # Report health every 10 cycles
     TOKEN_REFRESH_EVERY_N = 120  # Refresh token every 120 cycles (~10 min)
     CRED_SYNC_EVERY_N = 60  # Sync credentials every 60 cycles (~5 min)
+    CRON_REPORT_EVERY_N = 30  # Sync Cron reports every 30 cycles (~2.5 min)
     UPGRADE_CHECK_EVERY_N = 360  # Check for upgrades every 360 cycles (~30 min)
 
     def __init__(self, cloud_url: str, edge_token: str = "",
@@ -405,6 +406,10 @@ class EdgeSyncDaemon:
         self._stats["cycles"] += 1
         if self._stats["cycles"] % self.HEALTH_EVERY_N == 0:
             self._report_health()
+
+        # 6.5 v2.2: CronReporter — flush edge Cron reports to CloudCronSupervisor
+        if self._stats["cycles"] % self.CRON_REPORT_EVERY_N == 0:
+            self._flush_cron_reports()
 
         # 7. v2.0: Token refresh (every N cycles)
         if (self._client.token and
@@ -742,7 +747,23 @@ class EdgeSyncDaemon:
         self._client.report_health(health)
         self._stats["health_reports"] += 1
 
-    # ── Cache ─────────────────────────────────────
+    def _flush_cron_reports(self):
+        """v2.2: Flush edge Cron execution reports to CloudCronSupervisor."""
+        try:
+            from exoskeleton.layer3.cron_reporter import CronReporter
+            node_id = self._client._edge_id or os.uname().nodename
+            reporter = CronReporter(
+                node_id=node_id,
+                cloud_url=self._cloud_url,
+                data_dir=self._data_dir,
+            )
+            reporter._sync_pending()
+        except ImportError:
+            pass
+        except Exception as e:
+            logger.debug(f"CronReporter: {e}")
+
+    # ──    # ── Cache ─────────────────────────────────────
 
     def _save_cache(self, filepath: str, data: list):
         try:

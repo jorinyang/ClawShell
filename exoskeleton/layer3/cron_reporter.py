@@ -201,7 +201,7 @@ class CronReporter:
             pending = list(self._pending)
 
         if not pending:
-            return
+            return {"flushed": 0}
 
         try:
             import urllib.request

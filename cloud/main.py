@@ -110,6 +110,8 @@ def create_app() -> FastAPI:
                 "topology": "active" if _topology else "inactive",
                 "knowledge_graph": "active" if _knowledge_graph else "inactive",
                 "pubsub": "active" if (hasattr(_eventbus, '_pubsub') and _eventbus._pubsub) else "inactive",
+                "cron_supervisor": "active" if _cron_supervisor else "inactive",
+                "dispatch_router": "active" if _dispatch_router else "inactive",
             },
             "edges_online": _swarm.online_count() if _swarm else 0,
         }
