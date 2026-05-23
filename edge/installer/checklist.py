@@ -9,14 +9,17 @@ from typing import Callable, Optional
 # Provider defaults per model prefix (order matters: check most specific first)
 LLM_PROVIDER_MAP: list[tuple[str, str, str]] = [
     # (model_prefix, provider, endpoint)
+    # OpenAI-compatible endpoints (use /chat/completions):
     ("deepseek",          "deepseek",  "https://api.deepseek.com/v1"),
     ("gpt-",              "openai",    "https://api.openai.com/v1"),
     ("o1-",               "openai",    "https://api.openai.com/v1"),
     ("o3-",               "openai",    "https://api.openai.com/v1"),
     ("MiniMax-",          "minimax",   "https://api.minimax.chat/v1"),
     ("minimax-",          "minimax",   "https://api.minimax.chat/v1"),
-    ("claude-",           "anthropic", "https://api.anthropic.com/v1"),
-    ("anthropic/",        "anthropic", "https://api.anthropic.com/v1"),
+    # Anthropic uses non-OpenAI-compatible API (/v1/messages, different format).
+    # Requires an Anthropic adapter or compatibility proxy.
+    ("claude-",           "anthropic", "https://api.anthropic.com"),
+    ("anthropic/",        "anthropic", "https://api.anthropic.com"),
 ]
 
 LLM_DEFAULT_MODEL = "deepseek-v4-pro"
@@ -180,6 +183,10 @@ class InstallationChecklist:
         print("║                                                  ║")
         print("║ 3. Access ClawShell repo:                        ║")
         print("║    → https://github.com/jorinyang/ClawShell      ║")
+        print("║                                                  ║")
+        print("║ 💡 Recommended: Obsidian for multi-device         ║")
+        print("║    knowledge sync via clawshell.club/couchdb     ║")
+        print("║    → https://obsidian.md/download                ║")
         print("╚══════════════════════════════════════════════════╝")
         print()
 

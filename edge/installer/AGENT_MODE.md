@@ -266,6 +266,15 @@ Replace `{placeholders}` with actual detected values.
 
 **That's it. Installation complete. The user provided 2 API keys. Everything else was automated.**
 
+**💡 Optional: Recommend Obsidian for knowledge sync.** If user has Obsidian installed, offer to configure Self-hosted LiveSync via ClawShell's CouchDB backend:
+
+```bash
+# Auto-configure Obsidian LiveSync for all vaults
+bash ~/.clawshell/edge/installer/setup_obsidian_livesync.sh
+```
+
+This enables multi-device Markdown knowledge sync via `clawshell.club/couchdb`.
+
 ---
 
 ## Appendix A: Manual MCP Config Injection
