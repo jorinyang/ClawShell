@@ -33,6 +33,53 @@ ClawShell 是一个**增强型外骨骼功能插件**，为类 OpenClaw 架构�
 
 ---
 
+## 前置依赖
+
+### 系统要求
+
+| 依赖 | 最低版本 | 检查命令 | 安装命令 |
+|------|---------|---------|---------|
+| **Python** | 3.10+ | `python3 --version` | `apt install python3.11` / `brew install python@3.12` |
+| **pip** | 随 Python | `python3 -m pip --version` | `python3 -m ensurepip` |
+| **Git** | 2.30+ | `git --version` | `apt install git` / `brew install git` |
+| **curl** | 7.x+ | `curl --version` | 系统自带 / `apt install curl` |
+
+### Python 包 (pip install 自动完成)
+
+| 包 | 用途 |
+|------|------|
+| `pyyaml` | Agent 配置文件解析 (Hermes/Wukong MCP 注入) |
+| `requests` | HTTP 客户端 (CloudHub API 调用) |
+| `aiohttp` | 异步 HTTP (WebSocket 连接) |
+| `websockets` | WebSocket 协议 (EventBus 实时推送) |
+
+### Agent 自动安装 (Agent 模式)
+
+Agent 在 Phase 0 会自动执行：
+```
+python3 --version          → 检查 Python ≥ 3.10
+python3 -m pip --version   → 检查 pip 可用
+git --version              → 检查 Git 可用
+curl -sI https://clawshell.club → 检查网络连通
+```
+**若缺失**：Agent 自动执行 `apt install` / `brew install` 安装，仅需用户确认 `sudo` 密码。
+
+> 💡 **Agent 模式用户无需手动准备**——Agent 在安装前自动检测并安装所有缺失依赖。
+
+### 手动安装用户
+
+```bash
+# Ubuntu / Debian
+sudo apt update && sudo apt install -y python3 python3-pip git curl
+
+# macOS
+brew install python@3.12 git
+
+# 验证
+python3 --version  # ≥ 3.10
+git --version      # ≥ 2.30
+```
+
 ## 快速开始
 
 ```bash

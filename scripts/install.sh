@@ -45,27 +45,74 @@ detect_os() {
 OS=$(detect_os)
 json_progress "detect" "ok" "os=$OS|home=$CLAWSHELL_HOME"
 
-# ── Python check ────────────────────────────────────────────────
+# ── Prerequisite auto-install ─────────────────────────────────────
+# Detect package manager
+PKG_MGR=""
+if command -v apt &>/dev/null; then PKG_MGR="apt"
+elif command -v brew &>/dev/null; then PKG_MGR="brew"
+elif command -v yum &>/dev/null; then PKG_MGR="yum"
+elif command -v pacman &>/dev/null; then PKG_MGR="pacman"
+fi
+json_progress "pkg_mgr" "ok" "$PKG_MGR"
+
+install_pkg() {
+    local pkg="$1"
+    case $PKG_MGR in
+        apt) sudo apt install -y "$pkg" 2>/dev/null ;;
+        brew) brew install "$pkg" 2>/dev/null ;;
+        yum) sudo yum install -y "$pkg" 2>/dev/null ;;
+        pacman) sudo pacman -S --noconfirm "$pkg" 2>/dev/null ;;
+        *) return 1 ;;
+    esac
+}
+
+# ── Python 3.10+ ──────────────────────────────────────────────────
 if command -v python3 &>/dev/null; then
     if python3 -c 'import sys; exit(0 if sys.version_info >= (3,10) else 1)'; then
         PY_VER=$(python3 -c 'import sys; print(".".join(map(str,sys.version_info[:2])))')
         json_progress "python" "ok" "version=$PY_VER"
     else
-        json_progress "python" "fail" "version<$PY_VER needs 3.10+"
-        exit 10
+        json_progress "python" "fail" "version too old, attempting install..."
+        install_pkg "python3" && json_progress "python" "ok" "installed via $PKG_MGR" || { json_progress "python" "fail" "cannot install"; exit 10; }
     fi
 else
-    json_progress "python" "fail" "not found"
-    exit 10
+    json_progress "python" "fail" "not found, attempting install..."
+    [ "$PKG_MGR" = "brew" ] && install_pkg "python@3.12" || install_pkg "python3"
+    command -v python3 &>/dev/null && json_progress "python" "ok" "installed via $PKG_MGR" || { json_progress "python" "fail" "cannot install"; exit 10; }
 fi
 
-# ── Git check ───────────────────────────────────────────────────
-if command -v git &>/dev/null; then
-    json_progress "git" "ok" "found"
+# ── pip ───────────────────────────────────────────────────────────
+if python3 -m pip --version &>/dev/null; then
+    json_progress "pip" "ok" "found"
 else
-    json_progress "git" "fail" "not found"
-    exit 11
+    json_progress "pip" "fail" "attempting install..."
+    install_pkg "python3-pip" 2>/dev/null || python3 -m ensurepip --upgrade 2>/dev/null
+    python3 -m pip --version &>/dev/null && json_progress "pip" "ok" "installed" || json_progress "pip" "warn" "pip not available"
 fi
+
+# ── Git ───────────────────────────────────────────────────────────
+if command -v git &>/dev/null; then
+    GIT_VER=$(git --version 2>/dev/null | grep -oP '[0-9]+\\.[0-9]+')
+    json_progress "git" "ok" "version=$GIT_VER"
+else
+    json_progress "git" "fail" "not found, attempting install..."
+    install_pkg "git" && json_progress "git" "ok" "installed via $PKG_MGR" || { json_progress "git" "fail" "cannot install"; exit 11; }
+fi
+
+# ── Network ───────────────────────────────────────────────────────
+if curl -sI --max-time 5 https://clawshell.club >/dev/null 2>&1; then
+    json_progress "network" "ok" "clawshell.club reachable"
+else
+    json_progress "network" "warn" "clawshell.club unreachable — continuing offline"
+fi
+
+# ── Pip deps check ────────────────────────────────────────────────
+json_progress "deps" "check" "pyyaml requests aiohttp websockets"
+python3 -c "import yaml" 2>/dev/null || MISSING_DEPS="$MISSING_DEPS pyyaml"
+python3 -c "import requests" 2>/dev/null || MISSING_DEPS="$MISSING_DEPS requests"
+python3 -c "import aiohttp" 2>/dev/null || MISSING_DEPS="$MISSING_DEPS aiohttp"
+python3 -c "import websockets" 2>/dev/null || MISSING_DEPS="$MISSING_DEPS websockets"
+[ -n "$MISSING_DEPS" ] && json_progress "deps" "pending" "missing:$MISSING_DEPS" || json_progress "deps" "ok" "all present"
 
 # ── Credentials (human only if not agent, or from env) ──────────
 CRED_RETRIES=0; MAX_CRED_RETRIES=3

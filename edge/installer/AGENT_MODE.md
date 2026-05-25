@@ -9,13 +9,102 @@
 
 ## Execution Rules for Agents
 
-1. **Ordered phases** — Execute Phase 1 → 2 → ... → 6 in sequence. Do not skip.
+1. **Ordered phases** — Execute Phase 0 → 1 → 2 → ... → 6 in sequence. Phase 0 is new: auto-detect and install prerequisites.
 2. **Exit code checks** — After each `bash` block, check `$?`. If 0, proceed. If non-zero, the step has failed.
 3. **Transient failures** — Git clone / pip install may fail due to network. Retry ONCE. If still failing, report to user.
 4. **Progress markers** — After each phase completes, say `[OK] Phase N complete` so the user (and parsing tools) can track progress.
 5. **Human interaction rule** — The ONLY time you ask the user for input is Phase 1 (API keys). Should be ONE message with 2 items. Collect both at once. Do not ask "should I proceed" — just proceed after collecting.
 6. **Install directory** — Default: `~/.clawshell`. If the user specified a different path, use it throughout.
 7. **Windows** — On Windows (PowerShell), substitute `python3` → `python`, `~/.clawshell` → `$env:USERPROFILE\.clawshell`.
+
+---
+
+## Phase 0: Prerequisites (AUTOMATED)
+
+Purpose: Before anything else, ensure all system dependencies are available.
+ALL automated — no user input.
+
+### Step 0a — Detect OS and package manager
+
+```bash
+uname -s                          # Linux / Darwin / MINGW*
+cat /etc/os-release 2>/dev/null   # Detect distro
+which apt yum brew pacman 2>/dev/null
+```
+
+**Determine package manager:**
+- `apt` → Debian/Ubuntu/WSL
+- `brew` → macOS
+- `yum` → RHEL/CentOS
+- `pacman` → Arch
+
+### Step 0b — Check Python ≥ 3.10
+
+```bash
+python3 --version 2>/dev/null || python --version 2>/dev/null
+```
+
+If not found or < 3.10, install:
+```bash
+# Debian/Ubuntu/WSL
+sudo apt update && sudo apt install -y python3 python3-pip python3-venv
+
+# macOS
+brew install python@3.12
+
+# RHEL/CentOS
+sudo yum install -y python3 python3-pip
+
+# Arch
+sudo pacman -S python python-pip
+```
+
+Verify: `python3 -c 'import sys; assert sys.version_info >= (3,10); print("OK")'`
+
+### Step 0c — Check Git ≥ 2.30
+
+```bash
+git --version 2>/dev/null
+```
+
+If missing:
+```bash
+# Debian/Ubuntu/WSL: sudo apt install -y git
+# macOS:             brew install git
+# RHEL/CentOS:       sudo yum install -y git
+# Arch:              sudo pacman -S git
+```
+
+### Step 0d — Check pip + network
+
+```bash
+python3 -m pip --version 2>/dev/null
+curl -sI --max-time 5 https://clawshell.club >/dev/null 2>&1 && echo "network: OK" || echo "network: FAIL"
+```
+
+If network fails: warn user but proceed (offline install not supported).
+
+### Step 0e — Check pre-existing Python packages
+
+```bash
+python3 -c "import yaml" 2>/dev/null || echo "pip: pyyaml missing (will install)"
+python3 -c "import requests" 2>/dev/null || echo "pip: requests missing (will install)"
+python3 -c "import aiohttp" 2>/dev/null || echo "pip: aiohttp missing (will install)"
+python3 -c "import websockets" 2>/dev/null || echo "pip: websockets missing (will install)"
+```
+
+**All missing packages will be installed in Phase 3 via `pip install`.**
+
+### Step 0f — Summary
+
+Report to user:
+- OS detected: {os}
+- Python: {version} ✅/❌
+- Git: {version} ✅/❌
+- pip: {version} ✅/❌
+- Network: {reachable/unreachable}
+
+**[OK] Phase 0 complete** — all prerequisites ready or auto-installed.
 
 ---
 
