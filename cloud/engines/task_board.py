@@ -217,6 +217,94 @@ class GlobalTaskBoard:
         result = {"reason": reason} if reason else None
         return self._transition(task_id, TaskStatus.CANCELLED, result)
 
+    # ── v2.2: MQ-inspired enhancements ─────────────
+
+    def create_with_dedup(self, task: dict, content_hash: Optional[str] = None) -> str:
+        """Create task with dedup. If content_hash matches existing PENDING
+        task, returns existing task_id instead of creating duplicate."""
+        # Derive hash from task dict if not explicitly passed
+        if content_hash is None:
+            content_hash = task.get("content_hash")
+        if content_hash:
+            with self._lock:
+                for tid, t in self._tasks.items():
+                    if (t.get("content_hash") == content_hash and
+                        t.get("status") == TaskStatus.PENDING.value):
+                        return tid
+        task["content_hash"] = content_hash
+        return self.create_task(task)
+
+    def claim_batch(self, edge_id: str, capability: str,
+                    max_count: int = 5) -> List[dict]:
+        """Claim up to N pending tasks matching a capability requirement."""
+        claimed = []
+        with self._lock:
+            candidates = [
+                t for t in self._tasks.values()
+                if t.get("status") == TaskStatus.PENDING.value
+                and capability in t.get("required_capabilities", [])
+                and not t.get("claimed_by")
+            ]
+            candidates.sort(key=lambda t: PRIORITY_ORDER.get(
+                TaskPriority(_normalize_priority(t.get("priority", "low"))), 99
+            ))
+            for task in candidates[:max_count]:
+                task["status"] = TaskStatus.IN_PROGRESS.value
+                task["claimed_by"] = edge_id
+                task["updated_at"] = time.time()
+                claimed.append(dict(task))
+        if claimed:
+            self._save()
+        return claimed
+
+    def fail_with_retry(self, task_id: str, error: Optional[str] = None) -> Optional[dict]:
+        """Fail a task. If max_retries not reached, auto-retry with backoff."""
+        with self._lock:
+            task = self._tasks.get(task_id)
+            if not task: return None
+
+            max_retries = task.get("max_retries", 3)
+            retry_count = task.get("retry_count", 0)
+
+            if retry_count < max_retries:
+                # Auto-retry: reset to PENDING with backoff delay
+                delay = min(2 ** retry_count, 60)  # 1s, 2s, 4s, 8s... max 60s
+                task["retry_count"] = retry_count + 1
+                task["retry_at"] = time.time() + delay
+                task["status"] = TaskStatus.PENDING.value
+                task["claimed_by"] = None
+                task["updated_at"] = time.time()
+                if error:
+                    task.setdefault("errors", []).append({
+                        "timestamp": time.time(), "error": error,
+                        "retry": retry_count + 1,
+                    })
+                self._save()
+                return dict(task)
+
+        # Exhausted retries → actual fail
+        return self.fail(task_id, error)
+
+    def expire_stale_tasks(self) -> int:
+        """Cancel all tasks that have passed their TTL. Returns count."""
+        now = time.time()
+        expired = 0
+        with self._lock:
+            for task in list(self._tasks.values()):
+                ttl = task.get("ttl_seconds")
+                if not ttl: continue
+                created = task.get("created_at", now)
+                if task["status"] == TaskStatus.PENDING.value and now - created >= ttl:
+                    task["status"] = TaskStatus.CANCELLED.value
+                    task.setdefault("results", []).append({
+                        "timestamp": now, "status": "cancelled",
+                        "data": {"reason": f"TTL expired ({ttl}s)"},
+                    })
+                    expired += 1
+        if expired:
+            self._save()
+        return expired
+
     def _transition(self, task_id: str, target: TaskStatus,
                     result: Optional[dict] = None) -> Optional[dict]:
         """Internal state transition."""

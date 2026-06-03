@@ -92,6 +92,13 @@ curl -fsSL https://clawshell.club/install.sh | bash
 
 # 🪟 Windows
 iwr https://clawshell.club/install.ps1 | iex
+
+# 🐳 Docker (解压即用，零依赖)
+docker run -d --name clawshell-edge \
+  --network host \
+  -v ~/.clawshell/data:/root/.clawshell/data \
+  -v ~/.clawshell/.env:/root/.clawshell/.env \
+  clawshell-edge
 ```
 
 Agent 会自动检测环境、安装依赖、注入 MCP 配置并生成自检报告。**人类只提供 2 个 API Key。**

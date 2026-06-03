@@ -1,0 +1,55 @@
+# ── ClawShell Docker Compose ──
+# Start: docker compose up -d
+# Logs:  docker compose logs -f
+# Stop:  docker compose down
+
+version: "3.8"
+
+services:
+  # ═══════════════════ CloudHub ═══════════════════
+  cloudhub:
+    image: clawshell-cloudhub:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.cloudhub
+    container_name: clawshell-cloudhub
+    ports:
+      - "8000:8000"
+    volumes:
+      - cloudhub_data:/root/.clawshell/data
+      - ./cloud.env:/root/.clawshell/.env:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - clawshell-net
+
+  # ═══════════════════ Edge Brain ═══════════════════
+  edge:
+    image: clawshell-edge:latest
+    build:
+      context: .
+    container_name: clawshell-edge
+    network_mode: host  # Direct network access for agent MCP
+    volumes:
+      - edge_data:/root/.clawshell/data
+      - ${HOME}/.clawshell/.env:/root/.clawshell/.env:ro
+      # Agent config mounts (for MCP auto-injection)
+      - ${HOME}/.hermes:/root/.hermes:ro
+    restart: unless-stopped
+    environment:
+      - CLAWSHELL_CLOUD_URL=${CLAWSHELL_CLOUD_URL:-http://47.239.71.174:8000}
+      - CLAWSHELL_NODE_ID=${CLAWSHELL_NODE_ID:-edge-docker}
+    profiles:
+      - edge
+
+volumes:
+  cloudhub_data:
+  edge_data:
+
+networks:
+  clawshell-net:
+    driver: bridge
