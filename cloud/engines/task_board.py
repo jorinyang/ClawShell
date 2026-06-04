@@ -74,7 +74,9 @@ PRIORITY_ORDER = {
 class GlobalTaskBoard:
     """Cross-edge shared task management board."""
 
-    def __init__(self, data_dir: str = "data"):
+    def __init__(self, data_dir: str = "data", max_pending: int = 0):
+        self._max_pending = max_pending if max_pending > 0 else None
+        self._backpressure_events = 0
         self._data_dir = data_dir
         os.makedirs(data_dir, exist_ok=True)
         self._tasks_file = os.path.join(data_dir, "tasks.json")
@@ -95,6 +97,19 @@ class GlobalTaskBoard:
             task["task_id"] = task_id
 
         with self._lock:
+            # Backpressure: reject if queue full
+            if self._max_pending:
+                pending_count = sum(
+                    1 for t in self._tasks.values()
+                    if t.get("status") == TaskStatus.PENDING.value
+                )
+                if pending_count >= self._max_pending:
+                    self._backpressure_events += 1
+                    raise RuntimeError(
+                        f"TaskBoard backpressure: {pending_count} pending >= "
+                        f"max {self._max_pending}. Rejected."
+                    )
+
             task.setdefault("status", TaskStatus.PENDING.value)
             task.setdefault("priority", TaskPriority.MEDIUM.value)
             task.setdefault("created_at", time.time())
@@ -199,6 +214,7 @@ class GlobalTaskBoard:
 
             task["status"] = TaskStatus.IN_PROGRESS.value
             task["claimed_by"] = edge_id
+            task["claimed_at"] = time.time()
             task["updated_at"] = time.time()
             self._save()
             return dict(task)
@@ -284,6 +300,34 @@ class GlobalTaskBoard:
 
         # Exhausted retries → actual fail
         return self.fail(task_id, error)
+
+    def release_stale_claims(self) -> int:
+        """Auto-release tasks claimed but not completed within claim_timeout.
+        Returns count of released tasks."""
+        now = time.time()
+        released = 0
+        with self._lock:
+            for task in list(self._tasks.values()):
+                if task.get("status") != TaskStatus.IN_PROGRESS.value:
+                    continue
+                timeout = task.get("claim_timeout", 300)  # default 5 min
+                claimed_at = task.get("claimed_at", task.get("updated_at", now))
+                if now - claimed_at > timeout:
+                    previous = task.get("claimed_by")
+                    task["status"] = TaskStatus.PENDING.value
+                    task["claimed_by"] = None
+                    task["claimed_at"] = None
+                    task["updated_at"] = now
+                    task.setdefault("claim_attempts", [])
+                    task["claim_attempts"].append({
+                        "released_at": now,
+                        "previous_claimer": previous,
+                        "reason": "claim_timeout_exceeded",
+                    })
+                    released += 1
+        if released:
+            self._save()
+        return released
 
     def expire_stale_tasks(self) -> int:
         """Cancel all tasks that have passed their TTL. Returns count."""
@@ -401,6 +445,8 @@ class GlobalTaskBoard:
                 "total": len(self._tasks),
                 "by_status": by_status,
                 "by_priority": by_priority,
+                "max_pending": self._max_pending,
+                "backpressure_events": self._backpressure_events,
             }
 
     # ── Persistence ───────────────────────────────
