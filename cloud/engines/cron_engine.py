@@ -1,9 +1,11 @@
 """CronEngine — unified cloud scheduler + cron supervisor (v2.3).
 
 Merges: CloudScheduler + CloudCronSupervisor into single engine.
+v2.3.1: ThreadPoolExecutor for concurrent job execution.
 """
 from __future__ import annotations
 import os, json, time, threading, uuid
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List, Callable, Optional, Any
 
 
@@ -31,6 +33,10 @@ class CronEngine:
         self._running = False
         self._thread: Optional[threading.Thread] = None
 
+        # v2.3.1: Thread pool for concurrent job execution
+        self._executor: Optional[ThreadPoolExecutor] = None
+        self._max_workers: int = 8
+
         # Supervisor state
         self._reports: List[dict] = []
         self._problems: List[dict] = []
@@ -47,6 +53,8 @@ class CronEngine:
             self._jobs[jid] = {"id": jid, "name": name, "schedule": schedule,
                                "handler": handler.__name__, "tags": tags or [],
                                "fail_count": 0, "last_run": 0.0, "status": "active"}
+            # v2.3.1: Auto-register handler so run_jobs_parallel can find it
+            self._handlers[handler.__name__] = handler
             self._save()
         return jid
 
@@ -70,6 +78,57 @@ class CronEngine:
             self._exec_log.append({"job_id": job_id, "time": time.time(), "success": False, "error": str(e)})
             with self._lock:
                 job["fail_count"] += 1
+            return {"job_id": job_id, "success": False, "error": str(e)}
+
+    # v2.3.1: Concurrent job execution
+    def _ensure_executor(self) -> ThreadPoolExecutor:
+        if self._executor is None:
+            self._executor = ThreadPoolExecutor(
+                max_workers=self._max_workers,
+                thread_name_prefix="cron-job"
+            )
+        return self._executor
+
+    def run_jobs_parallel(self, job_ids: List[str]) -> List[dict]:
+        """Run multiple jobs concurrently in the thread pool."""
+        executor = self._ensure_executor()
+        futures = {}
+        for jid in job_ids:
+            job = self._jobs.get(jid)
+            if not job:
+                continue
+            handler = self._handlers.get(job["handler"])
+            if not handler:
+                continue
+            # Prevent concurrent execution of the same job
+            with self._lock:
+                if job.get("_running"):
+                    continue
+                job["_running"] = True
+            futures[executor.submit(self._execute_safe, jid, handler)] = jid
+
+        results = []
+        for future in as_completed(futures, timeout=30):
+            jid = futures[future]
+            try:
+                results.append(future.result())
+            except Exception as e:
+                results.append({"job_id": jid, "success": False, "error": str(e)})
+        return results
+
+    def _execute_safe(self, job_id: str, handler: Callable) -> dict:
+        """Execute a handler and record the result safely."""
+        try:
+            result = handler()
+            self._exec_log.append({"job_id": job_id, "time": time.time(), "success": True})
+            with self._lock:
+                self._jobs[job_id]["_running"] = False
+            return {"job_id": job_id, "success": True, "result": str(result)[:200]}
+        except Exception as e:
+            self._exec_log.append({"job_id": job_id, "time": time.time(), "success": False, "error": str(e)})
+            with self._lock:
+                self._jobs[job_id]["fail_count"] += 1
+                self._jobs[job_id]["_running"] = False
             return {"job_id": job_id, "success": False, "error": str(e)}
 
     # ── Supervisor API ────────────────────────────────────────
