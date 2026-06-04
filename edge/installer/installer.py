@@ -69,6 +69,21 @@ class ClawShellEdgeInstaller:
         print(f"       Injected: {configured if configured else 'none'}")
         steps["config"] = "ok" if configured else "none"
 
+        # MemOS Cloud adapter — inject to all detected agents
+        memos_key = self.checklist.values.get("MEMOS_API_KEY") or os.environ.get("MEMOS_API_KEY", "")
+        if memos_key:
+            print("       Installing MemOS Cloud adapter to all agents...")
+            try:
+                from edge.memos_adapter.installer_hook import install_memos_to_all_agents
+                memos_result = install_memos_to_all_agents(api_key=memos_key)
+                print(f"       MemOS injected to: {memos_result['injected_agents']}")
+                steps["memos"] = f"ok ({len(memos_result['injected_agents'])} agents)"
+            except Exception as e:
+                print(f"       MemOS skip: {e}")
+                steps["memos"] = "skipped"
+        else:
+            steps["memos"] = "no-key"
+
         print("\n[6/6] Self-check...")
         report = self.reporter.run_self_check()
         print(f"       Status: {report['status']}")
