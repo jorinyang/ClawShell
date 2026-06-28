@@ -79,7 +79,55 @@ cp .env.example .env
 python -m local.sync.daemon
 ```
 
-### Method 3: Docker
+### Method 3: Desktop Application (Electron)
+
+ClawShell Local ships as an installable desktop app for Windows, macOS, and Linux.
+
+**Download from GitHub Releases:**
+
+Visit [https://github.com/jorinyang/ClawShell/releases](https://github.com/jorinyang/ClawShell/releases) and download the installer for your platform:
+
+| Platform | File |
+|----------|------|
+| Windows | `ClawShell Local Setup *.exe` (NSIS installer) |
+| macOS | `ClawShell Local-*.dmg` |
+| Linux | `ClawShell Local-*.AppImage` or `*.deb` |
+
+**Windows Installation:**
+1. Download the `.exe` installer
+2. Double-click to run (Windows may show SmartScreen — click "More info" → "Run anyway")
+3. Choose install directory, create desktop shortcut
+4. Launch "ClawShell Local" from Start Menu or desktop
+
+**macOS Installation:**
+1. Download the `.dmg` file
+2. Open and drag `ClawShell Local.app` to Applications
+3. On first launch, right-click the app → "Open" (Gatekeeper bypass once)
+
+**Linux Installation:**
+```bash
+# AppImage
+chmod +x "ClawShell Local-*.AppImage"
+./ClawShell Local-*.AppImage
+
+# Or via deb
+sudo dpkg -i clawshell-local_*.deb
+```
+
+**Build from source:**
+```bash
+# Auto-build for current platform
+python scripts/build_local_gui.py
+
+# Or for a specific platform
+python scripts/build_local_gui.py --platform win
+python scripts/build_local_gui.py --platform mac
+python scripts/build_local_gui.py --platform linux
+```
+
+The desktop app opens a local login window. Enter your Cloud Hub account credentials to connect.
+
+### Method 4: Docker
 
 ```bash
 # Local Brain (runs on your device)
@@ -93,7 +141,7 @@ docker run -d --name clawshell-local \
 docker compose -f deploy/docker-compose.yml up -d
 ```
 
-### Method 4: Install Script
+### Method 5: Install Script
 
 ```bash
 # Linux / macOS
