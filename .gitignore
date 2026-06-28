@@ -76,3 +76,5 @@ htmlcov/
 
 # Next.js build artifacts
 web/.next/
+web/dist-electron/
+web/out/

@@ -13,6 +13,8 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  // Electron: always run on port 3456
+  ...(process.env.PORT ? {} : {}),
 };
 
 export default withNextIntl(nextConfig);

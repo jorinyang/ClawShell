@@ -1,12 +1,49 @@
 {
-  "name": "clawshell-web",
+  "name": "clawshell-local",
   "version": "3.0.0",
   "private": true,
+  "main": "electron/main.js",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "electron:dev": "concurrently \"next dev -p 3456\" \"wait-on http://localhost:3456 && electron .\"",
+    "electron:build": "next build && electron-builder",
+    "electron:start": "next build && electron .",
+    "package:win": "next build && electron-builder --win",
+    "package:mac": "next build && electron-builder --mac",
+    "package:linux": "next build && electron-builder --linux"
+  },
+  "build": {
+    "appId": "club.clawshell.local",
+    "productName": "ClawShell Local",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      ".next/**/*",
+      "electron/**/*",
+      "public/**/*"
+    ],
+    "win": {
+      "target": ["nsis"],
+      "icon": "public/icon.ico"
+    },
+    "mac": {
+      "target": ["dmg"],
+      "icon": "public/icon.icns"
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "icon": "public/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "ClawShell Local"
+    }
   },
   "dependencies": {
     "next": "^15.3.3",
