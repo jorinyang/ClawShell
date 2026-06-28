@@ -37,6 +37,7 @@ edge = [
 
 [project.scripts]
 clawshell-cloud = "cloud.main:main"
+clawshell-local = "local.launcher:main"
 
 [project.urls]
 Homepage = "https://github.com/jorinyang/ClawShell"

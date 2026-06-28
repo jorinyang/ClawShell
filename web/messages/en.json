@@ -44,7 +44,9 @@
     "loginButton": "Sign In",
     "loginFailed": "Login failed. Please check your credentials.",
     "accountPlaceholder": "Enter account ID",
-    "passwordPlaceholder": "Enter password"
+    "passwordPlaceholder": "Enter password",
+    "noAccount": "Don't have an account?",
+    "registerNow": "Register now"
   },
   "changePassword": {
     "title": "Change Password",

@@ -98,6 +98,14 @@ export default function LoginPage() {
             )}
           </Button>
         </form>
+
+        {/* Register link */}
+        <p className="mt-4 text-center text-xs text-text-quaternary">
+          {t("noAccount")}{" "}
+          <a href="/register" className="text-accent hover:underline">
+            {t("registerNow")}
+          </a>
+        </p>
       </div>
     </div>
   );

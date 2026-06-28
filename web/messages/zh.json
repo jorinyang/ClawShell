@@ -44,7 +44,9 @@
     "loginButton": "登录",
     "loginFailed": "登录失败，请检查账户和密码",
     "accountPlaceholder": "请输入账户 ID",
-    "passwordPlaceholder": "请输入密码"
+    "passwordPlaceholder": "请输入密码",
+    "noAccount": "还没有账户？",
+    "registerNow": "立即注册"
   },
   "changePassword": {
     "title": "修改密码",

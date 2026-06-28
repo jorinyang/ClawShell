@@ -69,33 +69,44 @@ Your AI Agent (Hermes / Wukong / Claude Code / OpenClaw / ...)
 
 ## Quick Start
 
-### Agent Mode (Recommended)
-
-```
-# Tell your AI Agent:
-请帮我完成安装与配置：https://github.com/jorinyang/clawshell
-```
-
-The Agent auto-detects your environment, installs dependencies, injects MCP configs, and generates a self-check report.
-
-### CLI Mode
+### One Command (Recommended)
 
 ```bash
-# Linux / macOS
-curl -fsSL https://clawshell.club/install.sh | bash
+# Linux / macOS / WSL
+curl -fsSL https://raw.githubusercontent.com/jorinyang/ClawShell/main/install.sh | bash
+clawshell-local
 
-# Windows
-iwr https://clawshell.club/install.ps1 | iex
-
-# Docker (Local Brain)
-docker run -d --name clawshell-local \
-  --network host \
-  -v ~/.clawshell/data:/root/.clawshell/data \
-  -v ~/.clawshell/.env:/root/.clawshell/.env \
-  clawshell-local
+# Windows PowerShell
+iwr https://raw.githubusercontent.com/jorinyang/ClawShell/main/install.ps1 | iex
+clawshell-local
 ```
 
-### Docker Compose (Full Stack)
+After running `clawshell-local`, a browser opens at `http://localhost:3456/login`. Register or login to get started.
+
+What `clawshell-local` does:
+- Starts the local API server (port 8000)
+- Starts the web frontend (port 3456)
+- Opens your browser to the login page
+- All with one command. No Electron install needed.
+
+```bash
+clawshell-local                 # Full: API + Web UI → browser
+clawshell-local --api-only      # Just the API server
+clawshell-local --web-only      # Just the web UI (needs Node.js)
+clawshell-local --no-browser    # Don't open browser
+```
+
+### From Source
+
+```bash
+git clone https://github.com/jorinyang/ClawShell.git
+cd ClawShell
+pip install -e .
+cd web && npm install && npm run build && cd ..
+clawshell-local
+```
+
+### Docker
 
 ```bash
 # Clone and start (Cloud Hub + Web + Nginx)

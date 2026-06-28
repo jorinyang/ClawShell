@@ -38,83 +38,57 @@
 
 ## Installation
 
-### Prerequisites
-
-| Dependency | Minimum | Check |
-|-----------|---------|-------|
-| Python | 3.10+ | `python3 --version` |
-| Git | 2.30+ | `git --version` |
-| pip | bundled | `python3 -m pip --version` |
-
-### Method 1: Agent Auto-Install (Recommended)
-
-Tell your AI agent this one sentence:
-
-```
-请帮我完成安装与配置：https://github.com/jorinyang/clawshell
-```
-
-The agent will:
-1. Clone the ClawShell repository
-2. Detect your installed AI frameworks
-3. Install Python dependencies
-4. Auto-inject MCP/Hook/Config/Loop/Skill configurations
-5. Generate a self-check report
-
-### Method 2: Manual Install
+### One Command (Recommended)
 
 ```bash
-# Clone
-git clone https://github.com/jorinyang/ClawShell.git ~/.clawshell
-cd ~/.clawshell
+# Linux / macOS / WSL
+curl -fsSL https://raw.githubusercontent.com/jorinyang/ClawShell/main/install.sh | bash
 
-# Install
+# Windows PowerShell (Run as Administrator)
+iwr https://raw.githubusercontent.com/jorinyang/ClawShell/main/install.ps1 | iex
+```
+
+The installer auto-detects your environment, installs prerequisites (Python 3.10+, Git), clones the repo, builds the web frontend, and registers the `clawshell-local` command.
+
+After install, one command starts everything:
+
+```bash
+clawshell-local
+```
+
+Your browser opens to `http://localhost:3456/login`. Register or login — that's it.
+
+### Prerequisites (auto-installed if missing)
+
+| Dependency | Minimum | Auto-Install |
+|-----------|---------|-------------|
+| Python | 3.10+ | Yes (apt/brew/yum) |
+| Git | 2.30+ | Yes (apt/brew/yum) |
+| Node.js | 18+ | Manual only (https://nodejs.org) |
+
+### CLI Options
+
+```bash
+clawshell-local                 # API (port 8000) + Web UI (port 3456) → opens browser
+clawshell-local --api-only      # Just the API server
+clawshell-local --web-only      # Just the web UI (needs Node.js + next build)
+clawshell-local --no-browser    # Start services but don't open browser
+clawshell-local --port 9000     # Custom API port (web = port + 2656)
+```
+
+### From Source
+
+```bash
+git clone https://github.com/jorinyang/ClawShell.git
+cd ClawShell
 pip install -e .
-
-# Configure
-cp .env.example .env
-# Edit .env: set CLAWSHELL_CLOUD_URL, CLAWSHELL_API_TOKEN, your credentials
-
-# Start sync daemon
-python -m local.sync.daemon
+cd web && npm install && npm run build && cd ..
+clawshell-local
 ```
 
-### Method 3: Desktop Application (Electron)
+### Desktop Application (Electron)
 
-ClawShell Local ships as an installable desktop app for Windows, macOS, and Linux.
-
-**Download from GitHub Releases:**
-
-Visit [https://github.com/jorinyang/ClawShell/releases](https://github.com/jorinyang/ClawShell/releases) and download the installer for your platform:
-
-| Platform | File |
-|----------|------|
-| Windows | `ClawShell Local Setup *.exe` (NSIS installer) |
-| macOS | `ClawShell Local-*.dmg` |
-| Linux | `ClawShell Local-*.AppImage` or `*.deb` |
-
-**Windows Installation:**
-1. Download the `.exe` installer
-2. Double-click to run (Windows may show SmartScreen — click "More info" → "Run anyway")
-3. Choose install directory, create desktop shortcut
-4. Launch "ClawShell Local" from Start Menu or desktop
-
-**macOS Installation:**
-1. Download the `.dmg` file
-2. Open and drag `ClawShell Local.app` to Applications
-3. On first launch, right-click the app → "Open" (Gatekeeper bypass once)
-
-**Linux Installation:**
-```bash
-# AppImage
-chmod +x "ClawShell Local-*.AppImage"
-./ClawShell Local-*.AppImage
-
-# Or via deb
-sudo dpkg -i clawshell-local_*.deb
-```
-
-**Build from source:**
+Build the Electron desktop app (optional — `clawshell-local` is the simpler path):
 ```bash
 # Auto-build for current platform
 python scripts/build_local_gui.py
