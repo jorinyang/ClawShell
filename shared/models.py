@@ -481,3 +481,94 @@ class RepairPlan(BaseModel):
 
     def to_legacy_dict(self) -> dict[str, Any]:
         return self.model_dump(mode="json")
+
+
+# ── v3.0: Agent / Injection / Repo Models ───────────────────────────
+
+class InjectionStatus(BaseModel):
+    """Five injection method status."""
+    mcp: bool = False
+    hook: bool = False
+    config: bool = False
+    loop_skill: bool = False
+    skill: bool = False
+
+    def all_injected(self) -> bool:
+        return all([self.mcp, self.hook, self.config, self.loop_skill, self.skill])
+
+    def missing(self) -> list[str]:
+        items = []
+        if not self.mcp: items.append("mcp")
+        if not self.hook: items.append("hook")
+        if not self.config: items.append("config")
+        if not self.loop_skill: items.append("loop_skill")
+        if not self.skill: items.append("skill")
+        return items
+
+    def injected_count(self) -> int:
+        return sum([self.mcp, self.hook, self.config, self.loop_skill, self.skill])
+
+
+class AgentProfileModel(BaseModel):
+    """Agent instance — Pydantic v2 model."""
+    agent_id: str = ""                          # "hermes:dev-agent-01"
+    framework: str = ""                         # "hermes" | "wukong" | "claude_code"
+    agent_type: str = "framework"               # "framework" | "ide" | "bridge"
+    display_name: str = ""
+    config_path: str = ""
+    capabilities: list[str] = Field(default_factory=list)
+    skills: list[str] = Field(default_factory=list)
+    mcp_servers: list[str] = Field(default_factory=list)
+    injection_status: InjectionStatus = Field(default_factory=InjectionStatus)
+    status: str = "offline"
+    node_id: str = ""
+    user_id: str = ""
+    last_seen: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    def to_legacy_dict(self) -> dict[str, Any]:
+        return self.model_dump(mode="json")
+
+
+class AgentMeshEntry(BaseModel):
+    """AgentMesh registration entry."""
+    agent_id: str = ""
+    node_id: str = ""
+    user_id: str = ""
+    framework: str = ""
+    capabilities: list[str] = Field(default_factory=list)
+    status: str = "offline"
+    registered_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    last_heartbeat: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    current_task_id: str = ""
+
+    def to_legacy_dict(self) -> dict[str, Any]:
+        return self.model_dump(mode="json")
+
+
+class SkillRepoModel(BaseModel):
+    """GitHub skill repository."""
+    repo_name: str = ""
+    user_id: str = ""
+    pinyin_prefix: str = ""
+    git_url: str = ""
+    clone_path: str = ""
+    skills_count: int = 0
+    skills: list[str] = Field(default_factory=list)
+
+    def to_legacy_dict(self) -> dict[str, Any]:
+        return self.model_dump(mode="json")
+
+
+class KnowledgeRepoModel(BaseModel):
+    """GitHub knowledge repository."""
+    repo_name: str = ""
+    user_id: str = ""
+    pinyin_prefix: str = ""
+    git_url: str = ""
+    clone_path: str = ""
+    entries_count: int = 0
+    categories: list[str] = Field(default_factory=list)
+
+    def to_legacy_dict(self) -> dict[str, Any]:
+        return self.model_dump(mode="json")

@@ -115,7 +115,7 @@ def tool_edge_status(args: dict) -> dict:
         "node_id": NODE_ID,
         "node_name": CONFIG.get("node_name", "unknown"),
         "cloud_url": CLOUD_URL,
-        "version": "v1.12.0",
+        "version": "v3.0.0",
         "adapters": {
             "hermes": CONFIG.get("adapters", {}).get("hermes", {}).get("enabled", False),
             "wukong": CONFIG.get("adapters", {}).get("wukong", {}).get("enabled", False),
@@ -400,7 +400,7 @@ def handle_request(msg: dict) -> dict:
                     },
                     "serverInfo": {
                         "name": "clawshell-edge",
-                        "version": "1.12.0"
+                        "version": "3.0.0"
                     }
                 }
             }
@@ -454,7 +454,7 @@ def handle_request(msg: dict) -> dict:
 def main():
     """STDIO MCP server main loop."""
     # Log to stderr so stdout stays clean for JSON-RPC
-    sys.stderr.write(f"[clawshell-edge-mcp] Starting v1.12.0 | Cloud={CLOUD_URL} | Node={NODE_ID}\n")
+    sys.stderr.write(f"[clawshell-edge-mcp] Starting v3.0.0 | Cloud={CLOUD_URL} | Node={NODE_ID}\n")
     # Auto-register with CloudHub on startup
     try:
         import requests as _r

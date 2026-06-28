@@ -1,12 +1,18 @@
 {
   "/_not-found/page": "/_not-found",
-  "/audit/page": "/audit",
+  "/admin/pending/page": "/admin/pending",
   "/change-password/page": "/change-password",
-  "/credentials/page": "/credentials",
+  "/agents/page": "/agents",
+  "/audit/page": "/audit",
   "/endpoints/page": "/endpoints",
+  "/knowledge/page": "/knowledge",
   "/login/page": "/login",
-  "/nodes/page": "/nodes",
+  "/credentials/page": "/credentials",
+  "/register/page": "/register",
+  "/tasks/page": "/tasks",
   "/page": "/",
-  "/system/page": "/system",
-  "/users/page": "/users"
+  "/users/page": "/users",
+  "/skills/page": "/skills",
+  "/nodes/page": "/nodes",
+  "/system/page": "/system"
 }

@@ -1,4 +1,4 @@
-// File: /home/aorus/.clawshell/web/app/nodes/page.tsx
+// File: C:\Users\Aorus\Desktop\Project\兴趣研究\ClawShell\src\web\app\nodes\page.tsx
 import * as entry from '../../../../app/nodes/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 

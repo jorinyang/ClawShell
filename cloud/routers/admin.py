@@ -1,7 +1,12 @@
-"""Admin router: dashboard, user management, shared credentials, nodes, audit logs, endpoints."""
+"""Admin router: dashboard, user management, shared credentials, nodes, audit logs, endpoints.
+
+v3.0: adds user approval workflow (POST /admin/users/{id}/approve) with
+auto GitHub repo creation.
+"""
 
 from __future__ import annotations
 import time
+import logging
 from typing import Optional
 from fastapi import APIRouter, Request, HTTPException, Query
 from pydantic import BaseModel
@@ -18,6 +23,8 @@ from cloud.auth.shared_cred_service import SharedCredentialService
 from cloud.auth.session_service import SessionService
 from cloud.auth.audit_service import AuditService
 from cloud.auth.database import db_ctx, DB_PATH
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
@@ -68,6 +75,7 @@ async def dashboard(request: Request):
     return DashboardResponse(
         total_users=user_stats["total"],
         active_users=user_stats["active"],
+        pending_users=user_stats.get("pending", 0),
         total_credentials=CredentialService.count_credentials(),
         total_shared_credentials=SharedCredentialService.count(),
         total_nodes=_count_nodes(),
@@ -82,7 +90,7 @@ async def system_info(request: Request):
     payload = _require_admin(request)
     user_stats = UserService.count_users()
     return SystemInfoResponse(
-        version="2.0.0",
+        version="3.0.0",
         database_path=DB_PATH,
         total_users=user_stats["total"],
         total_credentials=CredentialService.count_credentials(),
@@ -135,6 +143,109 @@ async def delete_user(user_id: str, request: Request):
         UserService.delete_user(user_id, payload["role"], payload["sub"])
         AuditService.log(payload["sub"], "delete_user", target=user_id, ip=_get_ip(request))
         return {"status": "ok"}
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+# ── v3.0: User Approval ─────────────────────────────
+
+class ApproveResponse(BaseModel):
+    user: UserResponse
+    skills_repo: str = ""
+    knowledge_repo: str = ""
+    skills_repo_url: str = ""
+    knowledge_repo_url: str = ""
+
+
+@router.get("/pending-users", response_model=UserListResponse)
+async def list_pending_users(request: Request):
+    """List all users awaiting admin approval."""
+    _require_admin(request)
+    users = UserService.list_pending()
+    return UserListResponse(users=users, total=len(users))
+
+
+@router.post("/users/{user_id}/approve", response_model=ApproveResponse)
+async def approve_user(user_id: str, request: Request):
+    """Approve a pending user and auto-create GitHub repos.
+
+    Steps:
+    1. Verify admin permissions
+    2. Approve user (status: pending → active)
+    3. Create {pinyin_prefix}-skills repo on GitHub
+    4. Create {pinyin_prefix}-knowledge repo on GitHub
+    5. Record repo names in users table
+    """
+    payload = _require_admin(request)
+    admin_id = payload["sub"]
+
+    # Step 1-2: Approve
+    try:
+        user = UserService.approve_user(user_id, approved_by=admin_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    AuditService.log(admin_id, "approve_user", target=user_id, ip=_get_ip(request))
+
+    # Step 3-5: Create GitHub repos
+    skills_repo = ""
+    knowledge_repo = ""
+    skills_url = ""
+    knowledge_url = ""
+
+    try:
+        from cloud.config import config
+        from cloud.services.github_api import GitHubAPI, sanitize_repo_name
+
+        token = config.github_token or ""
+        if not token:
+            logger.warning("No GitHub token configured — skipping repo creation for %s", user_id)
+        else:
+            gh = GitHubAPI(token)
+            prefix = user.pinyin_prefix or "user"
+
+            skills_repo = gh.find_available_name(prefix, "skills")
+            knowledge_repo = gh.find_available_name(prefix, "knowledge")
+
+            gh.create_repo(skills_repo,
+                           description=f"ClawShell skills library for {user.display_name}",
+                           private=False)
+            gh.create_repo(knowledge_repo,
+                           description=f"ClawShell knowledge library for {user.display_name}",
+                           private=False)
+
+            skills_url = gh.get_repo_clone_url(skills_repo)
+            knowledge_url = gh.get_repo_clone_url(knowledge_repo)
+
+            UserService.set_user_repos(user_id, skills_repo, knowledge_repo)
+            AuditService.log(admin_id, "create_github_repos", target=user_id,
+                             details=f"skills={skills_repo}, knowledge={knowledge_repo}",
+                             ip=_get_ip(request))
+
+            logger.info("Created GitHub repos for %s: %s, %s", user_id, skills_repo, knowledge_repo)
+    except Exception as e:
+        logger.error("GitHub repo creation failed for %s: %s", user_id, e)
+        # User is already approved — don't roll back. Admin can retry repo creation.
+
+    return ApproveResponse(
+        user=user,
+        skills_repo=skills_repo,
+        knowledge_repo=knowledge_repo,
+        skills_repo_url=skills_url,
+        knowledge_repo_url=knowledge_url,
+    )
+
+
+@router.post("/users/{user_id}/disable", response_model=UserResponse)
+async def disable_user(user_id: str, request: Request):
+    """Disable a user account."""
+    payload = _require_admin(request)
+    try:
+        user = UserService.disable_user(user_id, actor_id=payload["sub"])
+        AuditService.log(payload["sub"], "disable_user", target=user_id, ip=_get_ip(request))
+        return user
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
     except ValueError as e:

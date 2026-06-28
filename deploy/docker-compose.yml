@@ -1,4 +1,4 @@
-# ClawShell Cloud Hub — Docker Compose v2.0
+# ClawShell Cloud Hub — Docker Compose v3.0
 # 3-service stack: API + Web Frontend + Nginx reverse proxy
 
 services:

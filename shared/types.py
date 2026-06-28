@@ -45,6 +45,28 @@ class EventCategory(str, Enum):
     ERROR = "error"
 
 
+# ── v3.0 Reconstruction Enums ─────────────────────
+
+class AdapterType(str, Enum):
+    FRAMEWORK = "framework"   # 智能体框架适配
+    BRIDGE = "bridge"         # 外部工具桥接
+    IDE = "ide"               # IDE CLI 适配
+
+
+class InjectionType(str, Enum):
+    MCP = "mcp"               # MCP Server 注入
+    HOOK = "hook"             # Hook 注入
+    CONFIG = "config"         # Config 注入
+    LOOP_SKILL = "loop_skill" # Loop Skill 注入
+    SKILL = "skill"           # Skill 注入
+
+
+class UserStatus(str, Enum):
+    PENDING = "pending"       # 待审批
+    ACTIVE = "active"         # 已激活
+    DISABLED = "disabled"     # 已禁用
+
+
 # ── Data Classes ─────────────────────────────────────
 
 @dataclass
@@ -249,4 +271,134 @@ class Broadcast:
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "Broadcast":
+        return cls(**{k: v for k, v in d.items() if k in cls.__dataclass_fields__})
+
+
+# ── v3.0: Agent & Injection Models ────────────────
+
+@dataclass
+class InjectionProfile:
+    """五种注入方式统一状态模型."""
+    mcp: bool = False
+    hook: bool = False
+    config: bool = False
+    loop_skill: bool = False
+    skill: bool = False
+
+    def all_injected(self) -> bool:
+        return all([self.mcp, self.hook, self.config, self.loop_skill, self.skill])
+
+    def missing(self) -> List[str]:
+        items = []
+        if not self.mcp: items.append("mcp")
+        if not self.hook: items.append("hook")
+        if not self.config: items.append("config")
+        if not self.loop_skill: items.append("loop_skill")
+        if not self.skill: items.append("skill")
+        return items
+
+    def injected_count(self) -> int:
+        return sum([self.mcp, self.hook, self.config, self.loop_skill, self.skill])
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "InjectionProfile":
+        return cls(**{k: v for k, v in d.items() if k in cls.__dataclass_fields__})
+
+
+@dataclass
+class AgentProfile:
+    """Agent 实例模型 — 一等公民."""
+    agent_id: str = ""                          # "hermes:dev-agent-01"
+    framework: str = ""                         # "hermes" | "wukong" | ...
+    agent_type: str = "framework"               # "framework" | "ide" | "bridge"
+    display_name: str = ""
+    config_path: str = ""                       # Agent 配置文件路径
+    capabilities: List[str] = field(default_factory=list)  # ["code", "review"]
+    skills: List[str] = field(default_factory=list)        # 已安装 Skill 名称
+    mcp_servers: List[str] = field(default_factory=list)   # 已配置 MCP Server
+    injection_status: InjectionProfile = field(default_factory=InjectionProfile)
+    status: str = "offline"
+    node_id: str = ""                           # 所属设备
+    user_id: str = ""                           # 所属用户
+    last_seen: float = field(default_factory=time.time)
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self):
+        if isinstance(self.injection_status, dict):
+            self.injection_status = InjectionProfile(**self.injection_status)
+
+    def to_dict(self) -> Dict[str, Any]:
+        d = asdict(self)
+        d["injection_status"] = self.injection_status.to_dict()
+        return d
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "AgentProfile":
+        d = d.copy()
+        if "injection_status" in d and isinstance(d["injection_status"], dict):
+            d["injection_status"] = InjectionProfile.from_dict(d["injection_status"])
+        return cls(**{k: v for k, v in d.items() if k in cls.__dataclass_fields__})
+
+
+@dataclass
+class AgentMeshNode:
+    """AgentMesh 协作节点."""
+    agent_id: str = ""
+    node_id: str = ""
+    user_id: str = ""
+    framework: str = ""
+    capabilities: List[str] = field(default_factory=list)
+    status: str = "offline"
+    registered_at: float = field(default_factory=time.time)
+    last_heartbeat: float = field(default_factory=time.time)
+    current_task_id: str = ""
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "AgentMeshNode":
+        return cls(**{k: v for k, v in d.items() if k in cls.__dataclass_fields__})
+
+
+@dataclass
+class SkillRepo:
+    """GitHub 技能库模型."""
+    repo_name: str = ""                         # "yy-skills"
+    user_id: str = ""
+    pinyin_prefix: str = ""
+    git_url: str = ""
+    clone_path: str = ""                        # 本地 clone 路径
+    skills_count: int = 0
+    last_synced: float = field(default_factory=time.time)
+    skills: List[str] = field(default_factory=list)  # Skill 名称列表
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "SkillRepo":
+        return cls(**{k: v for k, v in d.items() if k in cls.__dataclass_fields__})
+
+
+@dataclass
+class KnowledgeRepo:
+    """GitHub 知识库模型."""
+    repo_name: str = ""                         # "yy-knowledge"
+    user_id: str = ""
+    pinyin_prefix: str = ""
+    git_url: str = ""
+    clone_path: str = ""                        # 本地 clone 路径
+    entries_count: int = 0
+    last_synced: float = field(default_factory=time.time)
+    categories: List[str] = field(default_factory=list)  # 知识分类
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "KnowledgeRepo":
         return cls(**{k: v for k, v in d.items() if k in cls.__dataclass_fields__})

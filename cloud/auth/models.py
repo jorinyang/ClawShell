@@ -28,6 +28,12 @@ class UserResponse(BaseModel):
     role: str
     must_change_pwd: int
     is_active: int
+    pinyin_prefix: str = ""
+    github_skills_repo: str = ""
+    github_knowledge_repo: str = ""
+    status: str = "active"
+    approved_by: str = ""
+    approved_at: str = ""
     created_at: str
     updated_at: str
 
@@ -222,6 +228,7 @@ class EndpointConfig(BaseModel):
 class DashboardResponse(BaseModel):
     total_users: int
     active_users: int
+    pending_users: int = 0
     total_credentials: int
     total_shared_credentials: int
     total_nodes: int

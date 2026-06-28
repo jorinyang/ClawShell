@@ -1,0 +1,633 @@
+from __future__ import annotations
+"""Local Sync Daemon — orchestrator (v3.0.0).
+
+3-channel sync: Cloud Hub + GitHub + MemOS Cloud.
+Reports Agent-level health (not just Node-level) via AgentMesh.
+5-second cycle with WebSocket real-time push.
+"""
+import os
+import json
+import time
+import glob
+import threading
+import urllib.request
+import urllib.error
+import logging
+from typing import Dict, List, Optional, Any
+
+try:
+    from shared.hooks.registry import trigger_hook
+    from shared.hooks.manager import HookEvent
+except ImportError:
+    trigger_hook = None
+    HookEvent = None
+
+logger = logging.getLogger(__name__)
+
+
+
+from local.sync.client import CloudClient
+from local.sync.queue import OfflineQueue
+from local.sync.scanner import LocalEventScanner
+
+class EdgeSyncDaemon:
+    """Orchestrates the Local↔Cloud sync loop.
+
+    v2.0: Added token auto-refresh, credential sync on startup, and
+    WebSocket push integration via CredentialWSClient.
+    """
+
+    SYNC_INTERVAL = 5  # seconds
+    HEALTH_EVERY_N = 10  # Report health every 10 cycles
+    TOKEN_REFRESH_EVERY_N = 120  # Refresh token every 120 cycles (~10 min)
+    CRED_SYNC_EVERY_N = 60  # Sync credentials every 60 cycles (~5 min)
+    CRON_REPORT_EVERY_N = 30  # Sync Cron reports every 30 cycles (~2.5 min)
+    UPGRADE_CHECK_EVERY_N = 360  # Check for upgrades every 360 cycles (~30 min)
+
+    def __init__(self, cloud_url: str, edge_token: str = "",
+                 edge_id: str = "", data_dir: str = "~/.clawshell-edge"):
+        self._data_dir = os.path.expanduser(data_dir)
+        os.makedirs(self._data_dir, exist_ok=True)
+
+        self._cloud_url = cloud_url
+        self._client = CloudClient(cloud_url, edge_token, edge_id)
+        self._offline_queue = OfflineQueue(
+            os.path.join(self._data_dir, "offline_events.json")
+        )
+        self._scanner = LocalEventScanner()
+
+        # State cache files
+        self._insights_cache = os.path.join(self._data_dir, "cloud_insights.json")
+        self._broadcasts_cache = os.path.join(self._data_dir, "cloud_broadcasts.json")
+
+        # v2.0: Credential store and WebSocket client
+        self._cred_store = None
+        self._ws_client = None
+        self._init_auth_components()
+
+        # Stats
+        self._stats: Dict[str, int] = {
+            "events_synced": 0, "tasks_pulled": 0,
+            "insights_pulled": 0, "broadcasts_pulled": 0,
+            "health_reports": 0, "cycles": 0, "errors": 0,
+            "cred_syncs": 0, "token_refreshes": 0,
+        }
+
+        self._running = False
+        self._thread: Optional[threading.Thread] = None
+
+    def _init_auth_components(self):
+        """Initialize credential store and WebSocket client."""
+        try:
+            from local.auth.credential_store import LocalCredentialStore
+            self._cred_store = LocalCredentialStore(data_dir=self._data_dir)
+            logger.info("LocalCredentialStore initialized")
+        except ImportError:
+            logger.warning("CredentialStore not available")
+
+        # Start WebSocket client if we have a token
+        if self._client.token:
+            self._start_ws_client()
+
+    def _start_ws_client(self):
+        """Start the WebSocket client for real-time credential push."""
+        try:
+            from local.auth.ws_client import CredentialWSClient
+            if self._ws_client and self._ws_client.connected:
+                return  # Already running
+
+            self._ws_client = CredentialWSClient(
+                cloud_url=self._cloud_url,
+                token=self._client.token,
+                on_change=self._on_cred_change,
+            )
+            self._ws_client.start()
+            logger.info("CredentialWSClient started")
+        except ImportError:
+            logger.debug("CredentialWSClient not available")
+
+    def _on_cred_change(self):
+        """Callback: credential change detected via WebSocket."""
+        logger.info("Credential change detected — triggering sync")
+        self._sync_credentials()
+
+    # ── Daemon Lifecycle ──────────────────────────
+
+    def start(self):
+        if self._running:
+            return
+        self._running = True
+        self._thread = threading.Thread(target=self._loop, daemon=True, name="edge-sync")
+        self._thread.start()
+
+        # v2.0: Sync credentials on startup
+        if self._cred_store and self._client.token:
+            threading.Thread(
+                target=self._sync_credentials, daemon=True, name="startup-cred-sync"
+            ).start()
+
+    def shutdown(self):
+        self._running = False
+        if self._ws_client:
+            self._ws_client.stop()
+        if self._thread:
+            self._thread.join(timeout=10)
+
+    def run_once(self) -> dict:
+        """Execute one sync cycle (for testing/manual use)."""
+        return self._sync_cycle()
+
+    # ── Main Loop ─────────────────────────────────
+
+    def _loop(self):
+        while self._running:
+            try:
+                self._sync_cycle()
+            except Exception as e:
+                self._stats["errors"] += 1
+                logger.error(f"Sync cycle error: {e}")
+
+            # 5s chunks for fast shutdown
+            for _ in range(self.SYNC_INTERVAL):
+                if not self._running:
+                    break
+                time.sleep(1)
+
+    def _sync_cycle(self) -> dict:
+        """Execute one complete sync cycle."""
+
+        # Check for pending upgrade restart
+        if self._check_pending_restart():
+            self._running = False  # Signal loop to exit gracefully
+            return {"skipped": True, "reason": "upgrade_restart"}
+
+        # Pre-sync hook: allow cancellation
+        if trigger_hook is not None:
+            try:
+                pre_ctx = trigger_hook(
+                    HookEvent.PRE_SYNC,
+                    {"cycle": self._stats["cycles"] + 1},
+                    source="sync_daemon",
+                )
+                if pre_ctx.cancelled:
+                    logger.debug("Sync cycle skipped (PRE_SYNC hook cancelled)")
+                    return {
+                        "events_flushed": 0,
+                        "tasks_pulled": 0,
+                        "insights_pulled": 0,
+                        "broadcasts_pulled": 0,
+                        "skipped": True,
+                    }
+            except Exception:
+                pass
+
+        cycle_start = time.time()
+        result = {
+            "events_flushed": 0,
+            "tasks_pulled": 0,
+            "insights_pulled": 0,
+            "broadcasts_pulled": 0,
+        }
+
+        # 1. Scan local events
+        local_events = self._scanner.scan()
+        for evt in local_events:
+            self._offline_queue.enqueue(evt)
+
+        # 2. Flush queued events to Cloud
+        queued = self._offline_queue.dequeue_all()
+        if queued:
+            resp = self._client.push_events(queued)
+            if resp.get("success"):
+                result["events_flushed"] = len(queued)
+                self._stats["events_synced"] += len(queued)
+            else:
+                # Re-enqueue on failure
+                for evt in queued:
+                    self._offline_queue.enqueue(evt)
+
+        # 3. Pull tasks
+        tasks = self._client.pull_tasks(limit=5)
+        result["tasks_pulled"] = len(tasks)
+        self._stats["tasks_pulled"] += len(tasks)
+
+        # 4. Pull insights (action reference)
+        insights = self._client.pull_insights(limit=20)
+        if insights:
+            self._save_cache(self._insights_cache, insights)
+            result["insights_pulled"] = len(insights)
+            self._stats["insights_pulled"] += len(insights)
+
+        # 5. Pull broadcasts
+        broadcasts = self._client.pull_broadcasts(limit=20)
+        if broadcasts:
+            self._save_cache(self._broadcasts_cache, broadcasts)
+            result["broadcasts_pulled"] = len(broadcasts)
+            self._stats["broadcasts_pulled"] += len(broadcasts)
+
+        # 6. Health report (every N cycles)
+        self._stats["cycles"] += 1
+        if self._stats["cycles"] % self.HEALTH_EVERY_N == 0:
+            self._report_health()
+
+        # 6.5 v2.2: CronReporter — flush edge Cron reports to CloudCronSupervisor
+        if self._stats["cycles"] % self.CRON_REPORT_EVERY_N == 0:
+            self._flush_cron_reports()
+
+        # 7. v2.0: Token refresh (every N cycles)
+        if (self._client.token and
+                self._stats["cycles"] % self.TOKEN_REFRESH_EVERY_N == 0):
+            self._refresh_token()
+
+        # 8. v2.0: Credential sync (every N cycles, if no WebSocket)
+        if (self._cred_store and self._client.token and
+                self._stats["cycles"] % self.CRED_SYNC_EVERY_N == 0):
+            if not (self._ws_client and self._ws_client.connected):
+                # Only poll if WebSocket is not connected
+                self._sync_credentials()
+
+        # 9. Auto-upgrade check (every N cycles, ~30 min)
+        if self._stats["cycles"] % self.UPGRADE_CHECK_EVERY_N == 0:
+            self._check_and_upgrade()
+
+        # Post-sync hook
+        if trigger_hook is not None:
+            try:
+                trigger_hook(
+                    HookEvent.POST_SYNC,
+                    {"result": result, "duration": time.time() - cycle_start},
+                    source="sync_daemon",
+                )
+            except Exception:
+                pass
+
+        return result
+
+    # ── v2.0: Auth Operations ─────────────────────
+
+    def _refresh_token(self):
+        """Auto-refresh JWT token before expiry."""
+        new_token = self._client.refresh_token()
+        if new_token:
+            self._client.token = new_token
+            self._stats["token_refreshes"] += 1
+            logger.info("Token refreshed successfully")
+
+            # Update session file
+            try:
+                session_path = os.path.expanduser("~/.clawshell-edge/session.json")
+                if os.path.exists(session_path):
+                    with open(session_path) as f:
+                        session = json.load(f)
+                    session["token"] = new_token
+                    with open(session_path, "w") as f:
+                        json.dump(session, f, indent=2)
+            except Exception:
+                pass
+
+            # Update WebSocket client token
+            if self._ws_client:
+                self._ws_client.update_token(new_token)
+        else:
+            logger.warning("Token refresh failed")
+
+    def _sync_credentials(self):
+        """Sync credentials from cloud to local store.
+
+        Also syncs Memos Cloud user_id mapping when 'memos_cloud' credentials
+        are received. The Memos config is stored as a credential of type
+        'memos_cloud' with fields: user_id, api_url, api_key.
+        """
+        if not self._cred_store:
+            return
+
+        try:
+            result = self._client.sync_credentials()
+            if result.get("success"):
+                user_creds = result.get("user_credentials", {})
+                shared_creds = result.get("shared_credentials", {})
+
+                # Flatten grouped creds
+                user_list = []
+                for service, creds in user_creds.items():
+                    user_list.extend(creds)
+                shared_list = []
+                for service, creds in shared_creds.items():
+                    shared_list.extend(creds)
+
+                if user_list:
+                    self._cred_store.merge_and_save(user_list)
+                    # Sync Memos Cloud user_id mapping from credentials
+                    self._sync_memos_cloud_config(user_list)
+                if shared_list:
+                    self._cred_store.save_shared_credentials(shared_list)
+
+                self._stats["cred_syncs"] += 1
+                summary = self._cred_store.summary()
+                logger.info(
+                    f"Credentials synced: {summary['user_credential_count']} user, "
+                    f"{summary['shared_credential_count']} shared"
+                )
+            else:
+                logger.warning(f"Credential sync failed: {result.get('error')}")
+        except Exception as e:
+            logger.error(f"Credential sync error: {e}")
+
+    def _sync_memos_cloud_config(self, cred_list: List[dict]):
+        """Extract and store Memos Cloud config from synced credentials.
+
+        Looks for credentials with service='memos_cloud' and stores the
+        user_id mapping locally so the edge knows which Memos user_id
+        maps to which ClawShell user_id.
+        """
+        for cred in cred_list:
+            if cred.get("service") != "memos_cloud":
+                continue
+            try:
+                plain_value = cred.get("cred_value", "")
+                if not plain_value:
+                    # Try to get from cred_value_enc (already stored)
+                    continue
+                config = json.loads(plain_value) if isinstance(plain_value, str) else plain_value
+                user_id = config.get("user_id", "")
+                api_url = config.get("api_url", "")
+                api_key = config.get("api_key", "")
+                if user_id and api_url:
+                    self._cred_store.save_memos_cloud_config(user_id, api_url, api_key)
+                    logger.info(f"Memos Cloud config synced for user {user_id}")
+            except (json.JSONDecodeError, TypeError) as e:
+                logger.warning(f"Failed to parse Memos Cloud credential: {e}")
+
+    # ── Version ────────────────────────────────────
+
+    def _get_edge_version(self) -> str:
+        """Get ClawShell Edge version for health reporting."""
+        import os
+        try:
+            version_file = os.path.join(os.path.dirname(__file__), "..", "__version__.py")
+            with open(version_file) as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith("__version__"):
+                        return line.split("=")[1].strip().strip('"').strip("'")
+        except Exception:
+            pass
+        return "unknown"
+
+    # ── Auto Upgrade ─────────────────────────────────
+
+    def _check_and_upgrade(self) -> bool:
+        """Check for newer ClawShell Edge version and auto-upgrade if available.
+
+        Returns True if an upgrade was performed, False otherwise.
+        """
+        import logging
+        logger = logging.getLogger("edge.sync.upgrade")
+
+        current_version = self._get_edge_version()
+        if current_version == "unknown":
+            logger.debug("Cannot determine current version for upgrade check")
+            return False
+
+        try:
+            # Fetch latest version from GitHub releases
+            import urllib.request
+            url = "https://api.github.com/repos/jorinyang/ClawShell/releases/latest"
+            req = urllib.request.Request(url, headers={"Accept": "application/json"})
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = __import__("json").loads(resp.read())
+            latest = data.get("tag_name", "").lstrip("v")
+            if not latest:
+                return False
+
+            # Compare versions (simple semver comparison)
+            def parse_ver(v):
+                return tuple(int(x) for x in v.split(".")[:3])
+
+            if parse_ver(latest) > parse_ver(current_version):
+                logger.info(
+                    "Newer ClawShell Edge version available: %s (current: %s)",
+                    latest, current_version
+                )
+                # Download and apply upgrade
+                upgrade_ok = self._apply_upgrade(latest)
+                if upgrade_ok:
+                    logger.info("Auto-upgrade to v%s completed", latest)
+                    return True
+                else:
+                    logger.warning("Auto-upgrade failed, continuing with v%s", current_version)
+            else:
+                logger.debug("Edge v%s is up to date (latest: v%s)", current_version, latest)
+
+        except Exception as e:
+            logger.debug("Upgrade check failed: %s", e)
+
+        return False
+
+    def _apply_upgrade(self, target_version: str) -> bool:
+        """Apply upgrade to target version via git pull + pip install.
+
+        After applying, signals a pending restart so the daemon can be
+        restarted by an external supervisor (systemd/service manager).
+        """
+        import logging, subprocess, json
+        logger = logging.getLogger("edge.sync.upgrade")
+        edge_repo = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+
+        try:
+            # 1. Git pull latest
+            r1 = subprocess.run(
+                ["git", "pull", "origin", "main"],
+                cwd=edge_repo, capture_output=True, text=True, timeout=60
+            )
+            if r1.returncode != 0:
+                logger.warning("git pull failed: %s", r1.stderr.strip())
+                return False
+
+            # 2. pip install -e . to pick up any dependency changes
+            r2 = subprocess.run(
+                ["pip", "install", "-e", ".", "--quiet"],
+                cwd=edge_repo, capture_output=True, text=True, timeout=120
+            )
+            if r2.returncode != 0:
+                logger.warning("pip install failed: %s", r2.stderr.strip())
+                return False
+
+            # 3. Write pending-upgrade flag so daemon loop knows to restart
+            flag_file = os.path.join(self._data_dir, "pending_upgrade.json")
+            with open(flag_file, "w") as f:
+                json.dump({"version": target_version, "applied_at": time.time()}, f)
+
+            logger.info("Upgrade to v%s applied, daemon restart pending", target_version)
+            return True
+
+        except Exception as e:
+            logger.error("Upgrade failed: %s", e)
+            return False
+
+    def _check_pending_restart(self) -> bool:
+        """Check if a pending upgrade flag exists and initiate graceful restart.
+
+        Returns True if restart was initiated (daemon should exit).
+        """
+        flag_file = os.path.join(self._data_dir, "pending_upgrade.json")
+        if not os.path.exists(flag_file):
+            return False
+
+        try:
+            import json
+            with open(flag_file) as f:
+                data = json.load(f)
+            logger = __import__("logging").getLogger("edge.sync.upgrade")
+            logger.info("Pending upgrade to v%s detected — initiating graceful restart", data.get("version"))
+            # Remove flag so we don't loop
+            os.remove(flag_file)
+            return True
+        except Exception:
+            return False
+
+    # ── System Info ────────────────────────────────────
+
+    @property
+    def _system_info(self):
+        if not hasattr(self, '_cached_sys_info'):
+            try:
+                from local.detector.system import detect_system_info
+                self._cached_sys_info = detect_system_info()
+            except Exception:
+                self._cached_sys_info = {}
+        return self._cached_sys_info
+
+    # ── Health ────────────────────────────────────
+
+    def _report_health(self):
+        """Report edge health to Cloud.
+
+        Includes detected frameworks and IDE tools in the health report
+        so the cloud can track which frameworks/IDEs each edge node has.
+        """
+        # Detect frameworks and IDEs
+        frameworks = []
+        ide_tools = []
+        try:
+            from local.detector import detect_all_frameworks
+            detected = detect_all_frameworks()
+            frameworks = [f.to_dict() for f in detected]
+        except ImportError:
+            pass
+        except Exception:
+            pass
+
+        try:
+            from local.ide_bridge import detect_ide_tools
+            ide_tools = detect_ide_tools()
+        except ImportError:
+            pass
+        except Exception:
+            pass
+
+        # Include system info (cached after first call)
+        sys_info = self._system_info
+
+        try:
+            import psutil
+            health = {
+                "node_id": self._client._edge_id,
+                "version": self._get_edge_version(),
+                "hostname": sys_info.get("hostname", ""),
+                "ip_address": sys_info.get("ip_address", ""),
+                "os": sys_info.get("os", ""),
+                "os_version": sys_info.get("os_version", ""),
+                "python_version": sys_info.get("python_version", ""),
+                "cpu_count": sys_info.get("cpu_count", 0),
+                "memory_total_mb": sys_info.get("memory_total_mb", 0),
+                "metrics": {
+                    "cpu_percent": psutil.cpu_percent(interval=1),
+                    "memory_percent": psutil.virtual_memory().percent,
+                    "disk_percent": psutil.disk_usage("/").percent,
+                },
+                "frameworks": frameworks,
+                "ide_tools": ide_tools,
+                "services": {},
+                "uptime_seconds": time.time(),
+            }
+        except ImportError:
+            health = {
+                "node_id": self._client._edge_id,
+                "version": self._get_edge_version(),
+                "hostname": sys_info.get("hostname", ""),
+                "ip_address": sys_info.get("ip_address", ""),
+                "os": sys_info.get("os", ""),
+                "os_version": sys_info.get("os_version", ""),
+                "python_version": sys_info.get("python_version", ""),
+                "cpu_count": sys_info.get("cpu_count", 0),
+                "memory_total_mb": sys_info.get("memory_total_mb", 0),
+                "metrics": {"cpu_percent": 0, "memory_percent": 0, "disk_percent": 0},
+                "frameworks": frameworks,
+                "ide_tools": ide_tools,
+            }
+
+        self._client.report_health(health)
+        self._stats["health_reports"] += 1
+
+    def _flush_cron_reports(self):
+        """v2.2: Flush edge Cron execution reports to CloudCronSupervisor."""
+        try:
+            from local.compiler.layer3.cron_reporter import CronReporter
+            node_id = self._client._edge_id or os.uname().nodename
+            reporter = CronReporter(
+                node_id=node_id,
+                cloud_url=self._cloud_url,
+                data_dir=self._data_dir,
+            )
+            reporter._sync_pending()
+        except ImportError:
+            pass
+        except Exception as e:
+            logger.debug(f"CronReporter: {e}")
+
+    # ──    # ── Cache ─────────────────────────────────────
+
+    def _save_cache(self, filepath: str, data: list):
+        try:
+            with open(filepath, "w") as f:
+                json.dump(data, f, default=str, indent=2)
+        except Exception:
+            pass
+
+    def get_cached_insights(self) -> List[dict]:
+        return self._read_cache(self._insights_cache)
+
+    def get_cached_broadcasts(self) -> List[dict]:
+        return self._read_cache(self._broadcasts_cache)
+
+    @staticmethod
+    def _read_cache(filepath: str) -> List[dict]:
+        if os.path.exists(filepath):
+            try:
+                with open(filepath) as f:
+                    return json.load(f)
+            except Exception:
+                pass
+        return []
+
+    # ── Stats ─────────────────────────────────────
+
+    def get_stats(self) -> dict:
+        return dict(self._stats)
+
+    def get_status(self) -> dict:
+        status = {
+            "running": self._running,
+            "cloud_connected": self._client.health_check(),
+            "offline_queue_size": self._offline_queue.size(),
+            "cloud_url": self._client._base_url,
+            "edge_id": self._client._edge_id,
+        }
+        # v2.0: Add credential and WebSocket status
+        if self._cred_store:
+            status["credentials"] = self._cred_store.summary()
+        if self._ws_client:
+            status["websocket"] = self._ws_client.get_status()
+        return status
+

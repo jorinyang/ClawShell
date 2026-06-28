@@ -1,4 +1,4 @@
-# ClawShell Cloud Hub — Dockerfile v2.0
+# ClawShell Cloud Hub — Dockerfile v3.0
 # Build context: project root (..)
 
 FROM python:3.11-slim

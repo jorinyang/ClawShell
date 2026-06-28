@@ -1,12 +1,18 @@
 {
   "/_not-found/page": "app/_not-found/page.js",
-  "/audit/page": "app/audit/page.js",
+  "/admin/pending/page": "app/admin/pending/page.js",
   "/change-password/page": "app/change-password/page.js",
-  "/credentials/page": "app/credentials/page.js",
+  "/agents/page": "app/agents/page.js",
+  "/audit/page": "app/audit/page.js",
   "/endpoints/page": "app/endpoints/page.js",
+  "/knowledge/page": "app/knowledge/page.js",
   "/login/page": "app/login/page.js",
-  "/nodes/page": "app/nodes/page.js",
+  "/credentials/page": "app/credentials/page.js",
+  "/register/page": "app/register/page.js",
+  "/tasks/page": "app/tasks/page.js",
   "/page": "app/page.js",
-  "/system/page": "app/system/page.js",
-  "/users/page": "app/users/page.js"
+  "/users/page": "app/users/page.js",
+  "/skills/page": "app/skills/page.js",
+  "/nodes/page": "app/nodes/page.js",
+  "/system/page": "app/system/page.js"
 }

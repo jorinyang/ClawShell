@@ -35,10 +35,14 @@ async def login(data: LoginRequest, request: Request):
 
 @router.post("/register", response_model=UserResponse)
 async def register(data: RegisterRequest, request: Request):
-    """Self-register a new user account (role=user)."""
+    """Self-register a new user account (role=user, status=pending).
+
+    User starts as pending — admin must approve before repos are created.
+    """
     import secrets as _secrets
     from cloud.auth.database import db_ctx
     from cloud.auth.crypto import hash_password
+    from cloud.services.github_api import generate_pinyin_prefix
 
     try:
         with db_ctx() as conn:
@@ -50,24 +54,18 @@ async def register(data: RegisterRequest, request: Request):
 
             user_id = f"usr_{_secrets.token_hex(3)}"
             pwd_hash = hash_password(data.password)
+            pinyin_prefix = generate_pinyin_prefix(data.display_name)
             conn.execute(
-                """INSERT INTO users (user_id, account_id, display_name, password_hash, role, must_change_pwd)
-                   VALUES (?, ?, ?, ?, 'user', 0)""",
-                (user_id, data.account_id, data.display_name, pwd_hash),
+                """INSERT INTO users (user_id, account_id, display_name, password_hash,
+                   role, must_change_pwd, pinyin_prefix, status)
+                   VALUES (?, ?, ?, ?, 'user', 0, ?, 'pending')""",
+                (user_id, data.account_id, data.display_name, pwd_hash, pinyin_prefix),
             )
             row = conn.execute("SELECT * FROM users WHERE user_id = ?", (user_id,)).fetchone()
 
         AuditService.log(user_id, "register", target=data.account_id, ip=_get_client_ip(request))
-        return UserResponse(
-            user_id=row["user_id"],
-            account_id=row["account_id"],
-            display_name=row["display_name"],
-            role=row["role"],
-            must_change_pwd=row["must_change_pwd"],
-            is_active=row["is_active"],
-            created_at=row["created_at"],
-            updated_at=row["updated_at"],
-        )
+        from cloud.auth.user_service import _row_to_user
+        return _row_to_user(row)
     except HTTPException:
         raise
     except Exception as e:

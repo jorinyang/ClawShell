@@ -3,6 +3,8 @@
 from shared.types import (
     ClawShellEvent, Task, Skill, EdgeNode, Insight, Broadcast,
     TaskStatus, TaskPriority, NodeStatus, EventCategory,
+    AdapterType, InjectionType, UserStatus,
+    InjectionProfile, AgentProfile, AgentMeshNode, SkillRepo, KnowledgeRepo,
 )
 from shared.protocol import (
     format_api_response, parse_api_request,
@@ -47,12 +49,16 @@ from shared.models import (
     Strategy, HealthStatus, TrustLevel, RepairLayer,
     CapabilityDomain, PerceptionDimension, OpenClawVariant,
     NodeID, TaskID, PluginID, EventID,
+    InjectionStatus, AgentProfileModel, AgentMeshEntry,
+    SkillRepoModel, KnowledgeRepoModel,
 )
 
 __all__ = [
     # types
     "ClawShellEvent", "Task", "Skill", "EdgeNode", "Insight", "Broadcast",
     "TaskStatus", "TaskPriority", "NodeStatus", "EventCategory",
+    "AdapterType", "InjectionType", "UserStatus",
+    "InjectionProfile", "AgentProfile", "AgentMeshNode", "SkillRepo", "KnowledgeRepo",
     # protocol
     "format_api_response", "parse_api_request",
     "format_ws_frame", "validate_ws_frame",
@@ -77,4 +83,17 @@ __all__ = [
     # utils
     "content_hash", "timestamp_now", "safe_json_dumps", "safe_json_loads",
     "validate_node_id", "generate_node_id", "match_wildcard",
+    # v1.9.0 Pydantic models
+    "NodeInfo", "NodeHeartbeat", "CortexInfo",
+    "PydanticTask", "TaskResult", "EventMessage", "PydanticInsight",
+    "Knowledge", "Memory", "Plugin", "PluginRegistry",
+    "HealthReport", "RepairAction",
+    "SystemPerception", "NetworkPerception", "PerceptionResult",
+    "SwarmNode", "CortexConfig", "GanglionConfig",
+    "Strategy", "HealthStatus", "TrustLevel", "RepairLayer",
+    "CapabilityDomain", "PerceptionDimension", "OpenClawVariant",
+    "NodeID", "TaskID", "PluginID", "EventID",
+    # v3.0 Agent & Repo models
+    "InjectionStatus", "AgentProfileModel", "AgentMeshEntry",
+    "SkillRepoModel", "KnowledgeRepoModel",
 ]

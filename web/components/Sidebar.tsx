@@ -15,16 +15,22 @@ import {
   Settings,
   LogOut,
   Shield,
+  Bot,
+  BookOpen,
+  Clock,
 } from "lucide-react";
 
 const navItems = [
   { href: "/", icon: LayoutDashboard, labelKey: "dashboard" },
   { href: "/system", icon: Settings, labelKey: "system" },
   { href: "/nodes", icon: Server, labelKey: "nodes" },
+  { href: "/agents", icon: Bot, labelKey: "agents" },
   { href: "/users", icon: Users, labelKey: "users" },
+  { href: "/skills", icon: BookOpen, labelKey: "skills" },
+  { href: "/knowledge", icon: FileText, labelKey: "knowledge" },
   { href: "/credentials", icon: Key, labelKey: "credentials" },
   { href: "/endpoints", icon: Globe, labelKey: "endpoints" },
-  { href: "/audit", icon: FileText, labelKey: "audit" },
+  { href: "/audit", icon: Clock, labelKey: "audit" },
 ];
 
 export function Sidebar() {
@@ -39,7 +45,7 @@ export function Sidebar() {
         <Shield className="h-5 w-5 text-accent" />
         <span className="text-[15px] font-medium text-foreground">ClawShell</span>
         <span className="rounded-[4px] bg-[rgba(94,106,210,0.15)] px-1.5 py-0.5 text-[10px] font-medium text-accent">
-          v2
+          v3
         </span>
       </div>
 

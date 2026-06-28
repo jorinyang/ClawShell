@@ -19,5 +19,5 @@ async def mcp_status(request: Request):
         "transport": "websocket",
         "status": "active" if mcp_hub else "standby",
         "domains": ["memory", "vault", "eventbus", "node", "task", "skill", "system"],
-        "version": "2.0.0",
+        "version": "3.0.0",
     }

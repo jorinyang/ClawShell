@@ -131,7 +131,27 @@ export const api = {
   updateEndpoint: (id: string, data: { enabled?: boolean; config?: any }) =>
     request<any>(`/admin/endpoints/${id}`, { method: "PUT", body: JSON.stringify(data) }),
 
-  // My Credentials (typed)
+  // v3.0: Register
+  register: (account_id: string, display_name: string, password: string) =>
+    request<any>("/auth/register", {
+      method: "POST",
+      body: JSON.stringify({ account_id, display_name, password }),
+    }),
+
+  // v3.0: Pending users (admin)
+  getPendingUsers: () =>
+    request<{ users: any[]; total: number }>("/admin/pending-users"),
+
+  approveUser: (userId: string) =>
+    request<any>(`/admin/users/${userId}/approve`, { method: "POST" }),
+
+  disableUser: (userId: string) =>
+    request<any>(`/admin/users/${userId}/disable`, { method: "POST" }),
+
+  // v3.0: Agents
+  getAgents: () => request<{ agents: any[]; total: number }>("/agents"),
+
+  getAgent: (agentId: string) => request<any>(`/agents/${agentId}`),
   getMyCredentials: () => request<any[]>("/credentials"),
 
   createCredential: (data: any) =>

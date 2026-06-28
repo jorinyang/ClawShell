@@ -1,4 +1,4 @@
-# ClawShell Cloud Hub — Docker Compose
+# ClawShell Cloud Hub — Docker Compose v3.0
 
 version: "3.8"
 

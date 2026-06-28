@@ -80,6 +80,49 @@ def _migrate(conn: sqlite3.Connection):
         logger.info("Migrating: adding cred_type column to shared_credentials")
         conn.execute("ALTER TABLE shared_credentials ADD COLUMN cred_type TEXT NOT NULL DEFAULT 'legacy'")
 
+    # ── v3.0 migrations: user fields + agent_registry ─────
+
+    cursor = conn.execute("PRAGMA table_info(users)")
+    user_columns = [row["name"] for row in cursor.fetchall()]
+
+    v3_user_fields = [
+        ("pinyin_prefix", "TEXT NOT NULL DEFAULT ''"),
+        ("github_skills_repo", "TEXT NOT NULL DEFAULT ''"),
+        ("github_knowledge_repo", "TEXT NOT NULL DEFAULT ''"),
+        ("status", "TEXT NOT NULL DEFAULT 'active'"),
+        ("approved_by", "TEXT NOT NULL DEFAULT ''"),
+        ("approved_at", "TEXT NOT NULL DEFAULT ''"),
+    ]
+    for col_name, col_def in v3_user_fields:
+        if col_name not in user_columns:
+            logger.info(f"Migrating users: adding {col_name} column")
+            conn.execute(f"ALTER TABLE users ADD COLUMN {col_name} {col_def}")
+
+    # Create agent_registry if not exists
+    conn.executescript("""
+        CREATE TABLE IF NOT EXISTS agent_registry (
+            agent_id    TEXT PRIMARY KEY,
+            node_id     TEXT NOT NULL DEFAULT '',
+            user_id     TEXT NOT NULL DEFAULT '',
+            framework   TEXT NOT NULL DEFAULT '',
+            agent_type  TEXT NOT NULL DEFAULT 'framework',
+            display_name TEXT NOT NULL DEFAULT '',
+            config_path TEXT NOT NULL DEFAULT '',
+            capabilities TEXT NOT NULL DEFAULT '[]',
+            skills      TEXT NOT NULL DEFAULT '[]',
+            mcp_servers TEXT NOT NULL DEFAULT '[]',
+            injection_status TEXT NOT NULL DEFAULT '{}',
+            status      TEXT NOT NULL DEFAULT 'offline',
+            last_seen   TEXT NOT NULL DEFAULT (datetime('now')),
+            metadata    TEXT NOT NULL DEFAULT '{}',
+            created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_agent_user ON agent_registry(user_id);
+        CREATE INDEX IF NOT EXISTS idx_agent_node ON agent_registry(node_id);
+        CREATE INDEX IF NOT EXISTS idx_agent_status ON agent_registry(status);
+    """)
+
 
 def init_database():
     """Create all tables if they don't exist, insert default admin."""
@@ -93,6 +136,12 @@ def init_database():
                 role        TEXT NOT NULL DEFAULT 'user',
                 must_change_pwd INTEGER NOT NULL DEFAULT 0,
                 is_active   INTEGER NOT NULL DEFAULT 1,
+                pinyin_prefix TEXT NOT NULL DEFAULT '',
+                github_skills_repo TEXT NOT NULL DEFAULT '',
+                github_knowledge_repo TEXT NOT NULL DEFAULT '',
+                status      TEXT NOT NULL DEFAULT 'active',
+                approved_by TEXT NOT NULL DEFAULT '',
+                approved_at TEXT NOT NULL DEFAULT '',
                 created_at  TEXT NOT NULL DEFAULT (datetime('now')),
                 updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
             );
@@ -196,10 +245,13 @@ def init_database():
             "SELECT user_id FROM users WHERE account_id = ?", ("jorinyang",)
         ).fetchone()
         if not existing:
+            from cloud.services.github_api import generate_pinyin_prefix
             pwd_hash = hash_password("clawshell2026")
+            prefix = generate_pinyin_prefix("杨瑒")
             conn.execute(
-                """INSERT INTO users (user_id, account_id, display_name, password_hash, role, must_change_pwd)
-                   VALUES (?, ?, ?, ?, ?, ?)""",
-                ("usr_000001", "jorinyang", "杨瑒", pwd_hash, "core_admin", 1),
+                """INSERT INTO users (user_id, account_id, display_name, password_hash,
+                   role, must_change_pwd, pinyin_prefix, status)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                ("usr_000001", "jorinyang", "杨瑒", pwd_hash, "core_admin", 1, prefix, "active"),
             )
             logger.info("Default core_admin user created: jorinyang")

@@ -1,3 +1,3 @@
-"""ClawShell Edge version."""
-__version__ = "2.0.1"
+"""ClawShell Edge version (backward compat shim)."""
+__version__ = "3.0.0"
 __edge_name__ = "ClawShell Edge"

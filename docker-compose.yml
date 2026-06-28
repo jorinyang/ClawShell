@@ -27,28 +27,28 @@ services:
     networks:
       - clawshell-net
 
-  # ═══════════════════ Edge Brain ═══════════════════
-  edge:
-    image: clawshell-edge:latest
+  # ═══════════════════ Local Brain ═══════════════════
+  local:
+    image: clawshell-local:latest
     build:
       context: .
-    container_name: clawshell-edge
+    container_name: clawshell-local
     network_mode: host  # Direct network access for agent MCP
     volumes:
-      - edge_data:/root/.clawshell/data
+      - local_data:/root/.clawshell/data
       - ${HOME}/.clawshell/.env:/root/.clawshell/.env:ro
       # Agent config mounts (for MCP auto-injection)
       - ${HOME}/.hermes:/root/.hermes:ro
     restart: unless-stopped
     environment:
       - CLAWSHELL_CLOUD_URL=${CLAWSHELL_CLOUD_URL:-http://47.239.71.174:8000}
-      - CLAWSHELL_NODE_ID=${CLAWSHELL_NODE_ID:-edge-docker}
+      - CLAWSHELL_NODE_ID=${CLAWSHELL_NODE_ID:-local-docker}
     profiles:
-      - edge
+      - local
 
 volumes:
   cloudhub_data:
-  edge_data:
+  local_data:
 
 networks:
   clawshell-net:

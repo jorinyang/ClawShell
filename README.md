@@ -1,181 +1,223 @@
 <div align="center">
-  <h1>🦀 ClawShell</h1>
-  <p><strong>一云多端云边协同分布式神经系统</strong></p>
-  <p>Cloud-Edge Collaborative Distributed Neural System</p>
+  <h1>🦀 ClawShell v3.0</h1>
+  <p><strong>Pluggable Exoskeleton Enhancement Layer for AI Agent Frameworks</strong></p>
+  <p>AI Agent 框架的即插即用外骨骼增强层</p>
 
   <p>
     <a href="https://clawshell.club"><img src="https://img.shields.io/badge/website-clawshell.club-22d3ee?style=flat-square" alt="Website"></a>
-    <a href="https://github.com/jorinyang/ClawShell/releases"><img src="https://img.shields.io/badge/release-v2.2.0-6366f1?style=flat-square" alt="Version"></a>
-    <a href="#"><img src="https://img.shields.io/badge/tests-586%2F586%20passed-34d399?style=flat-square" alt="Tests"></a>
+    <a href="https://github.com/jorinyang/ClawShell/releases"><img src="https://img.shields.io/badge/release-v3.0.0-6366f1?style=flat-square" alt="Version"></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-fbbf24?style=flat-square" alt="License"></a>
-    <a href="#"><img src="https://img.shields.io/badge/lines-~42K-f472b6?style=flat-square" alt="Lines"></a>
+    <a href="#"><img src="https://img.shields.io/badge/python-3.10%2B-34d399?style=flat-square" alt="Python"></a>
+    <a href="#"><img src="https://img.shields.io/badge/arch-4%20layers-f472b6?style=flat-square" alt="Architecture"></a>
   </p>
 </div>
 
 ---
 
-## 这是什么
+## What is ClawShell
 
-ClawShell 是一个**增强型外骨骼功能插件**，为类 OpenClaw 架构的 AI Agent 提供云边协同基础设施。
+ClawShell is a **pluggable exoskeleton enhancement layer** for OpenClaw-class AI agent frameworks. It provides self-perception, self-adaptation, self-organization, and multi-agent cluster capabilities — without modifying the host framework.
 
 ```
-你的 AI Agent (Hermes / Wukong / Claude Code / ...)
-              ↓ 接入 ClawShell
-  ☁️  19 引擎云端调度 + 跨设备记忆同步
-  🖥️  4 层外骨骼自感知/自适应/自组织/集群协作
-  🔌  MCP 协议自动注入，零配置即插即用
+Your AI Agent (Hermes / Wukong / Claude Code / OpenClaw / ...)
+              ↓ Plug in ClawShell
+  ☁️  Cloud Hub — 6-engine coordination layer
+  💻  ClawShell Local — 4-layer exoskeleton + agent discovery
+  🔌  5-way zero-config injection (MCP / Hook / Config / Loop / Skill)
+  🖥️  Desktop GUI — Electron + Next.js management interface
 ```
 
-> **一句话安装**：复制下面这句话发给任意 AI Agent，它自动完成全部部署。
-> ```
-> 请帮我完成安装与配置：https://github.com/jorinyang/clawshell
-> ```
+## Architecture
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                     ClawShell v3.0 Architecture                    │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│  ☁️ Cloud Hub (cloud/)                    🐙 GitHub (per-user)    │
+│  ├─ EventBus + TaskBoard                   ├─ {prefix}-skills     │
+│  ├─ CapabilityRegistry + AgentMesh         └─ {prefix}-knowledge  │
+│  ├─ InsightEngine + HermesLoop                                   │
+│  └─ Scheduler + Auth (register→approve→repos)                    │
+│                                                                   │
+│  💻 ClawShell Local (local/)              🖥️ Desktop GUI (web/)  │
+│  ├─ compiler/  L1~L4 Exoskeleton          ├─ Agent Dashboard      │
+│  ├─ adapters/  framework/bridge/ide       ├─ Adapter Panel        │
+│  ├─ agent/     Scanner+Injector+Store     ├─ Skill & Knowledge    │
+│  ├─ sync/      3-Channel SyncDaemon       ├─ Task Board           │
+│  └─ detector/  10+ Framework Detection    └─ Admin Panel          │
+│                                                                   │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### v3.0 Key Changes from v2.x
+
+| Dimension | v2.x | v3.0 |
+|-----------|------|------|
+| Cloud Engines | 19 engines | **6 engines** (slimmed, HermesLoop consolidates) |
+| Edge Brain | `edge/` | **`local/`** (renamed) |
+| Knowledge/Skills | Cloud-side storage | **Per-user GitHub repos** |
+| User Management | None | **Register→Pending→Approve→GitHub repos created** |
+| Agent Detection | Framework-level | **Individual Agent instance** discovery |
+| Injection | Basic MCP | **5-way**: MCP + Hook + Config + Loop Skill + Skill |
+| Adapters | Scattered (3 dirs) | **Unified**: framework/bridge/ide with single interface |
+| Sync | 1 channel (Cloud) | **3 channels**: GitHub + MemOS Cloud + Cloud Hub |
+| GUI | Basic admin pages | **16 pages**: register, agents, skills, knowledge, tasks, admin |
+| Cross-device | Node-level | **AgentMesh**: Agent-level capability matching |
 
 ---
 
-## 前置依赖
+## Quick Start
 
-### 系统要求
+### Agent Mode (Recommended)
 
-| 依赖 | 最低版本 | 检查命令 | 安装命令 |
-|------|---------|---------|---------|
-| **Python** | 3.10+ | `python3 --version` | `apt install python3.11` / `brew install python@3.12` |
-| **pip** | 随 Python | `python3 -m pip --version` | `python3 -m ensurepip` |
-| **Git** | 2.30+ | `git --version` | `apt install git` / `brew install git` |
-| **curl** | 7.x+ | `curl --version` | 系统自带 / `apt install curl` |
-
-### Python 包 (pip install 自动完成)
-
-| 包 | 用途 |
-|------|------|
-| `pyyaml` | Agent 配置文件解析 (Hermes/Wukong MCP 注入) |
-| `requests` | HTTP 客户端 (CloudHub API 调用) |
-| `aiohttp` | 异步 HTTP (WebSocket 连接) |
-| `websockets` | WebSocket 协议 (EventBus 实时推送) |
-
-### Agent 自动安装 (Agent 模式)
-
-Agent 在 Phase 0 会自动执行：
 ```
-python3 --version          → 检查 Python ≥ 3.10
-python3 -m pip --version   → 检查 pip 可用
-git --version              → 检查 Git 可用
-curl -sI https://clawshell.club → 检查网络连通
-```
-**若缺失**：Agent 自动执行 `apt install` / `brew install` 安装，仅需用户确认 `sudo` 密码。
-
-> 💡 **Agent 模式用户无需手动准备**——Agent 在安装前自动检测并安装所有缺失依赖。
-
-### 手动安装用户
-
-```bash
-# Ubuntu / Debian
-sudo apt update && sudo apt install -y python3 python3-pip git curl
-
-# macOS
-brew install python@3.12 git
-
-# 验证
-python3 --version  # ≥ 3.10
-git --version      # ≥ 2.30
-```
-
-## 快速开始
-
-```bash
-# 🤖 Agent 模式（推荐）
-# 对 Claude Code / Hermes / Codex 说：
+# Tell your AI Agent:
 请帮我完成安装与配置：https://github.com/jorinyang/clawshell
+```
 
-# 📦 CLI 模式
+The Agent auto-detects your environment, installs dependencies, injects MCP configs, and generates a self-check report.
+
+### CLI Mode
+
+```bash
+# Linux / macOS
 curl -fsSL https://clawshell.club/install.sh | bash
 
-# 🪟 Windows
+# Windows
 iwr https://clawshell.club/install.ps1 | iex
 
-# 🐳 Docker (解压即用，零依赖)
-docker run -d --name clawshell-edge \
+# Docker (Local Brain)
+docker run -d --name clawshell-local \
   --network host \
   -v ~/.clawshell/data:/root/.clawshell/data \
   -v ~/.clawshell/.env:/root/.clawshell/.env \
-  clawshell-edge
+  clawshell-local
 ```
 
-Agent 会自动检测环境、安装依赖、注入 MCP 配置并生成自检报告。**人类只提供 2 个 API Key。**
+### Docker Compose (Full Stack)
+
+```bash
+# Clone and start (Cloud Hub + Web + Nginx)
+git clone https://github.com/jorinyang/ClawShell.git
+cd ClawShell
+cp .env.example .env  # Edit with your credentials
+docker compose -f deploy/docker-compose.yml up -d
+```
 
 ---
 
-## 架构全景
+## User Registration Flow
 
-| 图表 | |
-|------|------|
-| 🗺️ **系统架构全景** | [官网](https://clawshell.club/#architecture) · [独立页](https://clawshell.club/architecture.html) — 19 Engines + 35 Edge Components |
-| 📊 **业务架构图** | [官网](https://clawshell.club/#biz-arch) · [独立页](https://clawshell.club/ClawShell_Business_Architecture.html) — 4 层业务模型 |
-| 🔗 **数据关系图** | [官网](https://clawshell.club/#data-rel) · [独立页](https://clawshell.club/ClawShell_Data_Relationship.html) — 数据源→存储→消费 |
+```
+1. Open clawshell.club → Register
+   - Enter account ID, display name, password
+   - System auto-generates pinyin_prefix from display name ("杨瑒"→"y")
 
----
+2. Wait for admin approval
+   - Status: pending
 
-## 能力矩阵
+3. Admin approves (Admin Panel → Pending Users → Approve)
+   - GitHub repos auto-created: {prefix}-skills, {prefix}-knowledge
+   - Status: active
 
-### ☁️ CloudHub 云枢 — 19 引擎
-
-| 引擎 | 职责 |
-|------|------|
-| `EventBus` `TaskBoard` `SkillMarket` | 事件流 · 任务分发 · 技能发布 |
-| `CapRegistry` `SwarmCoord` `Scheduler` | 节点管理 · 集群协调 · Cron 调度 |
-| `Evolution` `Review` `Broadcast` | 系统进化 · 深度复盘 · 广播通知 |
-| `Workflow` `Optimizer` `DeepThink` | 工作流编排 · 成本优化 · 深度推理 |
-| `Insight` `Topology` `Brain` | 系统洞察 · 拓扑分析 · LLM 智能 |
-| `KnowledgeGraph` `PubSub` | 知识图谱 · 发布订阅 |
-| 🆕 `CloudCronSupervisor` | 5 规则健康监测 + 自动修复派发 |
-| 🆕 `DispatchRouter` | 3 层分流: EventBus→TaskBoard→MCP→Manual |
-
-### 🖥️ Edge Brain 端脑 — 35 组件
-
-| 层级 | 能力 |
-|------|------|
-| **L1 自感知** | 27 项健康检测 |
-| **L2 自适应** | SelfRepairEngine (4 策略) · PI 控制器 · AdaptiveTuner |
-| **L3 自组织** | EdgeEventBus · TaskOrganizer (DAG) · 🆕 CronReporter |
-| **L4 集群** | SwarmManager · TrustEvaluator · EcologyMatcher |
-| 🆕 **Installer** | Agent-First · 10 Agent + 8 IDE 自动发现 · MCP 注入 |
-| 🔌 **MCP** | 19 tools (edge + memory) · STDIO · 自动激活 |
-
-### 🔄 数据同步
-
-| 通道 | 说明 |
-|------|------|
-| **REST API** | 76+ 端点 · JWT 鉴权 · AES-256-GCM 加密 |
-| **WebSocket** | 实时事件推送 · Dashboard 动态更新 |
-| **MCP Protocol** | 19 工具 STDIO · Agent 自动注入 |
-| **SyncDaemon** | 5 秒云边同步 · 9 步协议 · 离线持久化 |
+4. Login → Local auto-clones your skill/knowledge repos
+```
 
 ---
 
-## 技术规格
+## Capability Matrix
 
-| 指标 | 数据 |
-|------|------|
-| 云引擎 | 19 (Python 3.10+, stdlib-only, RLock thread-safe) |
-| 边缘组件 | 35 (L1-L4 外骨骼 + MCP + Installer + Gateway + IDE Bridge) |
-| API 端点 | 76+ (REST + WebSocket + MCP) |
-| 测试覆盖 | **586/586 passed** (10 维度 × 10 边界) |
-| 代码规模 | ~42,000 lines (Python 39K + Scripts + Config) |
-| Agent 检测 | 10 (Hermes/Wukong/OpenClaw/QClaw/CoPaw/HiClaw/EasyClaw/WorkBuddy/Cline/Cursor) |
-| IDE 检测 | 8 (Codex/Claude/Kimi/DeepSeek/Copilot/Windsurf/Orchestrator/Sandbox) |
-| LLM 支持 | DeepSeek V4 Pro · MiniMax M2.7 · OpenAI · Anthropic |
-| 部署 | ECS HK · Docker · Nginx SSL · Cloud Assistant |
+### ☁️ Cloud Hub — 6 Core Engines
+
+| Engine | Responsibility |
+|--------|---------------|
+| `EventBus` | Persistent event stream with dedup and broadcast |
+| `TaskBoard` | Cross-device shared task board |
+| `CapabilityRegistry` | Agent registration + capability declaration |
+| `AgentMesh` | Agent-level capability matching + cross-device task dispatch |
+| `InsightEngine` | Session insight aggregation + pattern mining |
+| `HermesLoop` | 4 cron loops: session summary, task dispatch, session review, knowledge push |
+
+### 💻 ClawShell Local
+
+| Layer | Capability |
+|-------|-----------|
+| **L1 Self-Perception** | 7 monitors (Health/System/Disk/Process/Agent/Gateway/Service) |
+| **L2 Self-Adaptation** | SelfRepairEngine (4 strategies) + FeedbackControlLoop + AdaptiveTuner |
+| **L3 Self-Organization** | EventBus + TaskOrganizer (DAG) + ContextManager + Ecology |
+| **L4 Multi-Agent Cluster** | SwarmEngine + TrustEvaluator + NicheMatcher + SwarmProtocol |
+| **Genome** | Knowledge heritage + Cache + EvolutionTracker |
+
+### 🔌 Five Injection Methods
+
+| Method | Target | How |
+|--------|--------|-----|
+| **MCP** | Register MCP Server | Modify `mcpServerConfig.json` |
+| **Hook** | Event hooks | Register event hook in agent config |
+| **Config** | Configuration injection | Write `config.yaml` / `.env` |
+| **Loop Skill** | Scheduled tasks | Register cron task / loop skill |
+| **Skill** | Skill injection | Write `SKILL.md` to skills directory |
+
+### 🔄 Three-Channel Sync
+
+| Channel | Data | Transport |
+|---------|------|-----------|
+| **GitHub** | Knowledge + Skills | git clone/pull/push |
+| **MemOS Cloud** | Memory | MemOS REST API |
+| **Cloud Hub** | Tasks + Credentials + Insights | REST + WebSocket (5s cycle) |
 
 ---
 
-## 设计原则
+## Supported Frameworks & Tools
 
-> **Engineering Cybernetics** — 信息反馈 · 动态调控 · 系统整体思维
+### Agent Frameworks (Auto-Detected)
+Hermes · Wukong · OpenClaw · QClaw · CoPaw · HiClaw · EasyClaw · WorkBuddy · Claude Code · Copaw
 
-**异构同效** · **无侵入** · **Agent-First** · **高内聚 · 低耦合** · **幂等性** · **端-云解耦**
+### IDE CLI Bridges
+Codex · Claude Code · Kimi Code · DeepSeek TUI · Copilot · Windsurf
+
+### Adapter Types
+| Type | Examples |
+|------|---------|
+| **framework** | Hermes, Wukong, OpenClaw |
+| **bridge** | N8N, Docker, ComfyUI, MemOS |
+| **ide** | Claude Code, Codex |
 
 ---
 
-## 许可证
+## Project Structure
+
+```
+ClawShell/
+├── cloud/           # Cloud Hub — FastAPI + 6 Engines + Event Sourcing
+│   ├── auth/        # User auth, approval flow, credential encryption
+│   ├── engines/     # EventBus, TaskBoard, AgentMesh, HermesLoop, etc.
+│   ├── routers/     # REST API endpoints (auth, admin, agents, tasks)
+│   └── services/    # GitHub API, MemOS Cloud client
+├── local/           # ClawShell Local (formerly "edge")
+│   ├── compiler/    # L1~L4 exoskeleton layers + Genome
+│   ├── adapters/    # framework/ bridge/ ide/ — unified BaseAdapter
+│   ├── agent/       # Scanner, Injector (5-way), ProfileStore
+│   ├── sync/        # 3-channel SyncDaemon
+│   └── detector/    # 10+ framework auto-detection
+├── shared/          # Shared types, models, utilities
+├── web/             # Desktop GUI — Electron + Next.js (16 pages)
+├── tests/           # Test suites
+├── deploy/          # Docker, Nginx, Terraform deployment configs
+└── docs/            # Architecture & design documents
+```
+
+---
+
+## Design Principles
+
+> **Engineering Cybernetics** — Information feedback, dynamic regulation, holistic system thinking
+
+**Non-Invasive** · **Low Coupling** · **High Robustness** · **High Generality** · **High Collaboration** · **High Extensibility** · **Idempotency** · **Cloud-Local Version Decoupling**
+
+---
+
+## License
 
 MIT © [智询工作室](https://clawshell.club)

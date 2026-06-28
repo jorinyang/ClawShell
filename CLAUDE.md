@@ -55,9 +55,9 @@ ClawShell 是一个适用于类 OpenClaw 架构的增强型外骨骼功能插件
 ```
 ClawShell/
 ├── cloud/           # Cloud Hub 云枢 — FastAPI + 引擎 + Event Sourcing
-├── edge/            # Edge Brain 端脑 — 检测/桥接/同步/适配
-├── exoskeleton/     # 外骨骼核心 — L1~L4 + Genome
+├── local/           # ClawShell Local — 检测/适配/编译/注入/同步
 ├── shared/          # 共享层 — 类型/模型/工具
+├── web/             # Local Desktop GUI (Electron + Next.js)
 ├── tests/           # 测试
 ├── docs/            # 文档
 ├── scripts/         # 运维脚本

@@ -1,5 +1,5 @@
--- ClawShell v2.0 Database Initialization
--- SQLite3 — 6 tables for multi-account auth system
+-- ClawShell v3.0 Database Initialization
+-- SQLite3 — 7 tables for multi-account auth system with user approval
 -- Run: sqlite3 /data/clawshell.db < init-db.sql
 
 PRAGMA journal_mode=WAL;

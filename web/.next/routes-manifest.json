@@ -39,6 +39,18 @@
       "namedRegex": "^/_not\\-found(?:/)?$"
     },
     {
+      "page": "/admin/pending",
+      "regex": "^/admin/pending(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/pending(?:/)?$"
+    },
+    {
+      "page": "/agents",
+      "regex": "^/agents(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/agents(?:/)?$"
+    },
+    {
       "page": "/audit",
       "regex": "^/audit(?:/)?$",
       "routeKeys": {},
@@ -63,6 +75,12 @@
       "namedRegex": "^/endpoints(?:/)?$"
     },
     {
+      "page": "/knowledge",
+      "regex": "^/knowledge(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/knowledge(?:/)?$"
+    },
+    {
       "page": "/login",
       "regex": "^/login(?:/)?$",
       "routeKeys": {},
@@ -75,10 +93,28 @@
       "namedRegex": "^/nodes(?:/)?$"
     },
     {
+      "page": "/register",
+      "regex": "^/register(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/register(?:/)?$"
+    },
+    {
+      "page": "/skills",
+      "regex": "^/skills(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/skills(?:/)?$"
+    },
+    {
       "page": "/system",
       "regex": "^/system(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/system(?:/)?$"
+    },
+    {
+      "page": "/tasks",
+      "regex": "^/tasks(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/tasks(?:/)?$"
     },
     {
       "page": "/users",

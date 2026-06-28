@@ -1,11 +1,15 @@
-"""ClawShell v2.0 Authentication & Account Management."""
+"""ClawShell v2.0 Authentication & Account Management.
+
+v3.0: adds pinyin prefix generation, pending approval flow,
+GitHub repo tracking, and agent_registry table.
+"""
 
 from cloud.auth.database import get_db, init_database
 from cloud.auth.models import (
     UserCreate, UserUpdate, UserResponse, UserListResponse,
     CredentialCreate, CredentialUpdate, CredentialResponse, CredentialSyncResponse,
     SharedCredentialCreate, SharedCredentialUpdate, SharedCredentialResponse,
-    LoginRequest, LoginResponse, TokenResponse, PasswordChange,
+    LoginRequest, LoginResponse, TokenResponse, PasswordChange, RegisterRequest,
     AuditLogResponse, AuditLogListResponse,
     NodeUpdate, EndpointConfig, DashboardResponse, SystemInfoResponse,
 )
@@ -22,7 +26,7 @@ __all__ = [
     "UserCreate", "UserUpdate", "UserResponse", "UserListResponse",
     "CredentialCreate", "CredentialUpdate", "CredentialResponse", "CredentialSyncResponse",
     "SharedCredentialCreate", "SharedCredentialUpdate", "SharedCredentialResponse",
-    "LoginRequest", "LoginResponse", "TokenResponse", "PasswordChange",
+    "LoginRequest", "LoginResponse", "TokenResponse", "PasswordChange", "RegisterRequest",
     "AuditLogResponse", "AuditLogListResponse",
     "NodeUpdate", "EndpointConfig", "DashboardResponse", "SystemInfoResponse",
 ]
