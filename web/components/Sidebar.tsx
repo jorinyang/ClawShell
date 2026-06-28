@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 
 const navItems = [
-  { href: "/", icon: LayoutDashboard, labelKey: "dashboard" },
+  { href: "/dashboard", icon: LayoutDashboard, labelKey: "dashboard" },
   { href: "/system", icon: Settings, labelKey: "system" },
   { href: "/nodes", icon: Server, labelKey: "nodes" },
   { href: "/agents", icon: Bot, labelKey: "agents" },

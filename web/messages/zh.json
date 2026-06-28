@@ -34,7 +34,11 @@
     "credentials": "凭证",
     "endpoints": "端点",
     "audit": "审计",
-    "settings": "设置"
+    "settings": "设置",
+    "agents": "Agent",
+    "skills": "技能",
+    "knowledge": "知识",
+    "tasks": "任务看板"
   },
   "login": {
     "title": "ClawShell 管理后台",

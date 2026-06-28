@@ -34,7 +34,11 @@
     "credentials": "Credentials",
     "endpoints": "Endpoints",
     "audit": "Audit",
-    "settings": "Settings"
+    "settings": "Settings",
+    "agents": "Agents",
+    "skills": "Skills",
+    "knowledge": "Knowledge",
+    "tasks": "Task Board"
   },
   "login": {
     "title": "ClawShell Admin",

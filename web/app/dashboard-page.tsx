@@ -45,60 +45,19 @@ export default function DashboardPage() {
   return (
     <AppShell>
       <div className="space-y-6 max-w-[1200px]">
-        {/* Stats Grid */}
         <div className="grid grid-cols-4 gap-4">
-          <StatusCard
-            title={t("totalUsers")}
-            value={data?.total_users ?? 0}
-            icon={Users}
-          />
-          <StatusCard
-            title={t("activeUsers")}
-            value={data?.active_users ?? 0}
-            icon={Activity}
-            color="success"
-          />
-          <StatusCard
-            title={t("totalCredentials")}
-            value={data?.total_credentials ?? 0}
-            icon={Key}
-          />
-          <StatusCard
-            title={t("totalNodes")}
-            value={data?.total_nodes ?? 0}
-            icon={Server}
-          />
+          <StatusCard title={t("totalUsers")} value={data?.total_users ?? 0} icon={Users} />
+          <StatusCard title={t("activeUsers")} value={data?.active_users ?? 0} icon={Activity} color="success" />
+          <StatusCard title={t("totalCredentials")} value={data?.total_credentials ?? 0} icon={Key} />
+          <StatusCard title={t("totalNodes")} value={data?.total_nodes ?? 0} icon={Server} />
         </div>
-
-        {/* Second Row */}
         <div className="grid grid-cols-3 gap-4">
-          <StatusCard
-            title={t("onlineNodes")}
-            value={data?.online_nodes ?? 0}
-            icon={Wifi}
-            color="success"
-          />
-          <StatusCard
-            title={t("activeSessions")}
-            value={data?.active_sessions ?? 0}
-            icon={Monitor}
-            color="info"
-          />
-          <StatusCard
-            title={t("recentAudit")}
-            value={data?.recent_audit_count ?? 0}
-            icon={FileText}
-          />
+          <StatusCard title={t("onlineNodes")} value={data?.online_nodes ?? 0} icon={Wifi} color="success" />
+          <StatusCard title={t("activeSessions")} value={data?.active_sessions ?? 0} icon={Monitor} color="info" />
+          <StatusCard title={t("recentAudit")} value={data?.recent_audit_count ?? 0} icon={FileText} />
         </div>
-
-        {/* Engine & Resources */}
         <div className="grid grid-cols-2 gap-4">
-          <EngineStatus
-            onlineNodes={data?.online_nodes ?? 0}
-            totalNodes={data?.total_nodes ?? 0}
-            activeSessions={data?.active_sessions ?? 0}
-            t={t}
-          />
+          <EngineStatus onlineNodes={data?.online_nodes ?? 0} totalNodes={data?.total_nodes ?? 0} activeSessions={data?.active_sessions ?? 0} t={t} />
           <ResourceChart cpu={45} memory={62} disk={38} t={t} />
         </div>
       </div>
